@@ -1,5 +1,6 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.Video;
 
 public class ExperimentFlow : MonoBehaviour
@@ -8,118 +9,154 @@ public class ExperimentFlow : MonoBehaviour
     [Tooltip("Assign the TrialManager in the Inspector (usually on your ExperimentManager object).")]
     public TrialManager trialManager;
 
-    [Tooltip("Assign the VideoPlayer used to present each trial clip (on your video screen object).")]
-    public VideoPlayer videoPlayer;
+    [Tooltip("Assign the GameObject containing trial video visuals.")]
+    public GameObject videoGroup;
 
-    [Tooltip("Assign the world-space reflection prompt Canvas GameObject.")]
-    public GameObject promptCanvas;
+    [Tooltip("Assign the GameObject containing reflection UI/content.")]
+    public GameObject reflectionGroup;
+
+    [Tooltip("Assign the GameObject containing garden visuals.")]
+    public GameObject gardenGroup;
+
+    [Tooltip("Assign the VideoPlayer used to present the happy clip.")]
+    public VideoPlayer videoPlayer;
 
     [Tooltip("Assign the GardenController component on your garden root object.")]
     public GardenController gardenController;
 
-    [Header("Durations (seconds)")]
-    public float reflectionDuration = 30f;
-    public float gardenDuration = 60f;
+    [Tooltip("Assign the happy clip to play when StartVideo is pressed.")]
+    public VideoClip happyVideoClip;
 
-    private bool videoFinished;
+    [Tooltip("Optional: assign the Start Garden button to enable it after reflection recording.")]
+    public Button startGardenButton;
+
+    private Coroutine startVideoRoutine;
 
     private void Start()
     {
-        StartCoroutine(RunAllTrials());
-    }
-
-    private IEnumerator RunAllTrials()
-    {
-        if (trialManager == null)
+        if (videoGroup != null)
         {
-            Debug.LogError("ExperimentFlow: TrialManager is not assigned.");
-            yield break;
+            videoGroup.SetActive(false);
         }
 
-        if (trialManager.trials == null || trialManager.trials.Count == 0)
+        if (reflectionGroup != null)
         {
-            trialManager.SetupTrials();
+            reflectionGroup.SetActive(false);
         }
 
-        if (promptCanvas != null)
+        if (gardenGroup != null)
         {
-            promptCanvas.SetActive(false);
-        }
-
-        if (gardenController != null)
-        {
-            gardenController.gameObject.SetActive(false);
-        }
-
-        for (int i = 0; i < trialManager.trials.Count; i++)
-        {
-            yield return StartCoroutine(RunTrial(trialManager.trials[i]));
+            gardenGroup.SetActive(false);
         }
     }
 
-    public IEnumerator RunTrial(TrialManager.Trial trial)
+    public void StartVideo()
     {
-        if (trial == null)
+        if (startVideoRoutine != null)
         {
-            yield break;
+            StopCoroutine(startVideoRoutine);
         }
 
-        if (videoPlayer != null && trial.videoClip != null)
+        startVideoRoutine = StartCoroutine(StartVideoRoutine());
+    }
+
+    public void StartGarden()
+    {
+        if (reflectionGroup != null)
         {
-            videoFinished = false;
-            videoPlayer.loopPointReached += OnVideoFinished;
-
-            videoPlayer.clip = trial.videoClip;
-            videoPlayer.Play();
-
-            // Wait until playback has reached the end; fallback loop also checks isPlaying.
-            yield return new WaitUntil(() => videoFinished || !videoPlayer.isPlaying);
-
-            videoPlayer.loopPointReached -= OnVideoFinished;
-        }
-        else
-        {
-            Debug.LogWarning("ExperimentFlow: Missing VideoPlayer or trial VideoClip.");
+            reflectionGroup.SetActive(false);
         }
 
-        if (promptCanvas != null)
+        if (gardenGroup != null)
         {
-            promptCanvas.SetActive(true);
-            yield return new WaitForSeconds(reflectionDuration);
-            promptCanvas.SetActive(false);
+            gardenGroup.SetActive(true);
         }
 
         if (gardenController == null)
         {
             Debug.LogWarning("ExperimentFlow: GardenController is not assigned.");
-            yield break;
+            return;
         }
 
-        gardenController.gameObject.SetActive(true);
+        StartCoroutine(gardenController.RunNonResponsiveSequence());
+    }
 
-        if (trial.responsiveness == TrialManager.ResponsivenessType.Responsive)
+    private IEnumerator StartVideoRoutine()
+    {
+        if (videoGroup != null)
         {
-            float valence = trial.emotion == TrialManager.EmotionType.Happy ? 1f : -1f;
-            float intensity = 0.8f;
-            gardenController.RunResponsiveGarden(valence, intensity);
+            videoGroup.SetActive(true);
+        }
+
+        if (videoPlayer == null)
+        {
+            Debug.LogWarning("ExperimentFlow: VideoPlayer is not assigned.");
         }
         else
         {
-            gardenController.RunNonResponsiveGarden();
+            VideoClip clipToPlay = happyVideoClip;
+            if (clipToPlay == null && trialManager != null)
+            {
+                clipToPlay = trialManager.happyClip;
+            }
+
+            if (clipToPlay == null)
+            {
+                Debug.LogWarning("ExperimentFlow: No happy video clip is assigned.");
+            }
+            else
+            {
+                videoPlayer.clip = clipToPlay;
+            }
+
+            bool videoFinished = false;
+            void OnLoopPointReached(VideoPlayer source) => videoFinished = true;
+
+            videoPlayer.loopPointReached += OnLoopPointReached;
+            videoPlayer.Play();
+
+            yield return new WaitUntil(() => videoFinished || !videoPlayer.isPlaying);
+            videoPlayer.loopPointReached -= OnLoopPointReached;
         }
 
-        yield return new WaitForSeconds(gardenDuration);
-        gardenController.gameObject.SetActive(false);
+        if (videoGroup != null)
+        {
+            videoGroup.SetActive(false);
+        }
+
+        if (reflectionGroup != null)
+        {
+            reflectionGroup.SetActive(true);
+        }
+
+        if (Microphone.devices != null && Microphone.devices.Length > 0)
+        {
+            Microphone.Start(null, false, 20, 44100);
+            yield return new WaitForSeconds(20f);
+
+            if (Microphone.IsRecording(null))
+            {
+                Microphone.End(null);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("ExperimentFlow: No microphone device found. Reflection recording skipped.");
+            yield return new WaitForSeconds(20f);
+        }
+
+        if (startGardenButton != null)
+        {
+            startGardenButton.interactable = true;
+        }
+
+        startVideoRoutine = null;
     }
 
-    // Compatibility wrapper for existing TrialManager calls.
+    // Kept for compatibility with TrialManager references; manual button flow is now used.
     public IEnumerator RunTrialSequence(TrialManager.Trial trial)
     {
-        yield return RunTrial(trial);
-    }
-
-    private void OnVideoFinished(VideoPlayer source)
-    {
-        videoFinished = true;
+        Debug.LogWarning("ExperimentFlow: RunTrialSequence is disabled. Use StartVideo() and StartGarden() via researcher UI.");
+        yield break;
     }
 }

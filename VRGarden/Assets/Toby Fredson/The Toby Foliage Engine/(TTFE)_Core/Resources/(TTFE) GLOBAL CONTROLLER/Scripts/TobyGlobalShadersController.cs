@@ -100,6 +100,21 @@ namespace TobyFredson
 			default: return 0;
 			}
 		}
+
+		public void SetSeason(float value)
+		{
+			season = Mathf.Clamp(value, -2f, 2f);
+		}
+
+		public void SetWindSpeed(float value)
+		{
+			windSpeed = Mathf.Clamp(value, 1f, 3f);
+		}
+
+		public void SetWindStrength(float value)
+		{
+			windStrength = Mathf.Clamp01(value);
+		}
 		#endregion
 
 		#region Client Impl

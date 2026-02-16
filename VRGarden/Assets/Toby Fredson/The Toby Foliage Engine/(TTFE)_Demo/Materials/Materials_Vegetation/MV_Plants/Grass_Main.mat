@@ -758,7 +758,7 @@ Material:
     - _SPEED: 1
     - _SSSFalloff: 0.1
     - _ScaleA: 0.4
-    - _SeasonChangeGlobal: 2
+    - _SeasonChangeGlobal: -2
     - _SeasonChangeGlobal1: 0.24
     - _SeasonVertexColorR: 0
     - _SeasonVertexColorR1: 0

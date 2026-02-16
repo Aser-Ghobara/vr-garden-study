@@ -283,7 +283,7 @@ Material:
     - _SSSMapOffset: 0.1
     - _SSSMapScale: 1
     - _Scale: 0
-    - _SeasonChangeGlobal: 2
+    - _SeasonChangeGlobal: -2
     - _SeasonVertexColorR: 1
     - _SelfShadingVertexColor: 1
     - _Shininess: 0.01
