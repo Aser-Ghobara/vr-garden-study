@@ -283,7 +283,7 @@ Material:
     - _SSSMapOffset: 0.1
     - _SSSMapScale: 1
     - _Scale: 0
-    - _SeasonChangeGlobal: -2
+    - _SeasonChangeGlobal: -0.2
     - _SeasonVertexColorR: 1
     - _SelfShadingVertexColor: 1
     - _Shininess: 0.01
@@ -302,7 +302,7 @@ Material:
     - _SpecularStrength: 1
     - _Specularpower: 1
     - _SrcBlend: 1
-    - _StrongWindSpeed: 3
+    - _StrongWindSpeed: 1
     - _SwitchVGreenToRGBA: 0
     - _TEXTUREMAPS: 0
     - _TEXTURESETTINGS: 0

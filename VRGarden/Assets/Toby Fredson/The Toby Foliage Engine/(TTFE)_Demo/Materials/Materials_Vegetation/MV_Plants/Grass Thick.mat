@@ -460,7 +460,7 @@ Material:
     - _SPECPOWER: 1
     - _SSSFalloff: 0
     - _ScaleA: 0.4
-    - _SeasonChangeGlobal: -2
+    - _SeasonChangeGlobal: -0.2
     - _SeasonVertexColorR: 0
     - _SecondaryFactor: 0.64
     - _SelfShading: 0
@@ -485,7 +485,7 @@ Material:
     - _SquashAmount: 1
     - _SrcBlend: 1
     - _StrongWind: 1
-    - _StrongWindSpeed: 3
+    - _StrongWindSpeed: 1
     - _StrongWindSpeed1: 1
     - _SubsurfaceDirect2: 0
     - _SubsurfaceNormalDistortion2: 0.5
