@@ -12,6 +12,9 @@ public class GardenController : MonoBehaviour
     public Light directionalLight;
     public ParticleSystem rainSystem;
     public ParticleSystem lightningSystem;
+    public Material phase1Skybox;
+    public Material phase2Skybox;
+    public Material phase3Skybox;
 
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine lightningFlashCoroutine;
@@ -105,6 +108,12 @@ public class GardenController : MonoBehaviour
         float nextLightningAt = Random.Range(10f, 20f);
 
         // Phase 1 (0-30s): calm baseline.
+        if (phase1Skybox != null)
+        {
+            RenderSettings.skybox = phase1Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
         if (rainSystem != null)
         {
             rainSystem.gameObject.SetActive(false);
@@ -148,6 +157,12 @@ public class GardenController : MonoBehaviour
         }
 
         // Phase 2 (30-60s): moderate escalation.
+        if (phase2Skybox != null)
+        {
+            RenderSettings.skybox = phase2Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
         if (rainSystem != null)
         {
             rainSystem.gameObject.SetActive(false);
@@ -189,6 +204,12 @@ public class GardenController : MonoBehaviour
         }
 
         // Phase 3 (60-120s): full escalation.
+        if (phase3Skybox != null)
+        {
+            RenderSettings.skybox = phase3Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
         if (rainSystem != null)
         {
             rainSystem.gameObject.SetActive(true);
