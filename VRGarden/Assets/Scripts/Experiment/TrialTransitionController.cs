@@ -52,6 +52,6 @@ public class TrialTransitionController : MonoBehaviour
 
         fadeCanvasGroup.gameObject.SetActive(false);
 
-        gardenController.StartNonResponsiveSequence();
+        gardenController.StartSeasonEscalation();
     }
 }
