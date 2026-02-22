@@ -8,6 +8,12 @@ public class TrialTransitionController : MonoBehaviour
     public CanvasGroup fadeCanvasGroup;
     public GardenController gardenController;
 
+    private void Awake()
+    {
+        fadeCanvasGroup.alpha = 0f;
+        fadeCanvasGroup.gameObject.SetActive(false);
+    }
+
     public void StartGardenTransition()
     {
         StartCoroutine(TransitionSequence());
@@ -15,8 +21,10 @@ public class TrialTransitionController : MonoBehaviour
 
     private IEnumerator TransitionSequence()
     {
-        float fadeDuration = 0.75f;
+        float fadeDuration = 1.2f;
         float elapsed = 0f;
+
+        fadeCanvasGroup.gameObject.SetActive(true);
 
         while (elapsed < fadeDuration)
         {
@@ -28,7 +36,6 @@ public class TrialTransitionController : MonoBehaviour
         fadeCanvasGroup.alpha = 1f;
 
         yield return new WaitForSeconds(0.3f);
-
         xrOrigin.transform.position = gardenSpawnPoint.position;
 
         yield return new WaitForSeconds(0.3f);
@@ -42,6 +49,8 @@ public class TrialTransitionController : MonoBehaviour
             yield return null;
         }
         fadeCanvasGroup.alpha = 0f;
+
+        fadeCanvasGroup.gameObject.SetActive(false);
 
         gardenController.StartNonResponsiveSequence();
     }

@@ -149,7 +149,7 @@ Material:
     - _GentleBreeze: 0
     - _GlobalFlutterIntensity: 0.2
     - _GlobalWindSpeed: 1
-    - _GlobalWindStrength: 1
+    - _GlobalWindStrength: 0.1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
@@ -186,7 +186,7 @@ Material:
     - _SSSFalloff: 0
     - _SSSMapOffset: 0
     - _SSSMapScale: 1
-    - _SeasonChangeGlobal: -0.2
+    - _SeasonChangeGlobal: -1.9075799
     - _SeasonVertexColorR: 0
     - _SelfShadingVertexColor: 0
     - _Shininess: 0.1
