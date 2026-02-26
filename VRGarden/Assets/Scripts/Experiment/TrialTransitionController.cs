@@ -40,6 +40,20 @@ public class TrialTransitionController : MonoBehaviour
 
         yield return new WaitForSeconds(0.3f);
 
+        // Re-enable jungle ambience before season escalation begins.
+        if (gardenController != null && gardenController.ambienceSource != null && gardenController.jungleClip != null)
+        {
+            gardenController.ambienceSource.Stop();
+            gardenController.ambienceSource.clip = gardenController.jungleClip;
+            gardenController.ambienceSource.loop = false;
+            gardenController.ambienceSource.volume = 0.05f;
+            gardenController.ambienceSource.Play();
+        }
+        else
+        {
+            Debug.LogWarning("TrialTransitionController: Missing GardenController ambienceSource or jungleClip for transition ambience.");
+        }
+
         elapsed = 0f;
         while (elapsed < fadeDuration)
         {

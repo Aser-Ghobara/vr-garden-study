@@ -134,7 +134,7 @@ Material:
     - _EnvironmentReflections: 1
     - _Float0: 1
     - _GentleBreeze: 0
-    - _GlobalWindStrength: 0.1
+    - _GlobalWindStrength: 0.55752933
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1

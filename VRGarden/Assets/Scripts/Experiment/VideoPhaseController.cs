@@ -7,9 +7,15 @@ public class VideoPhaseController : MonoBehaviour
     public VideoPlayer videoPlayer;
     public GameObject videoGroup;
     public GameObject reflectionGroup;
+    public GardenController gardenController;
 
     public void StartVideoPhase()
     {
+        if (gardenController != null && gardenController.ambienceSource != null)
+        {
+            gardenController.ambienceSource.Stop();
+        }
+
         if (videoPlayer == null)
         {
             Debug.LogWarning("VideoPhaseController: videoPlayer is not assigned.");
