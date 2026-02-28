@@ -149,7 +149,7 @@ Material:
     - _EnvironmentReflections: 1
     - _FlutterTangentMode: 0
     - _GlobalFlutterIntensity: 1
-    - _GlobalWindStrength: 0.55752933
+    - _GlobalWindStrength: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
@@ -190,7 +190,7 @@ Material:
     - _SSSFalloff: 0
     - _SSSMapOffset: 0
     - _SSSMapScale: 1
-    - _SeasonChangeGlobal: 1.1150587
+    - _SeasonChangeGlobal: -0.2
     - _SeasonVertexColorR: 0
     - _SelfShadingVertexColor: 0
     - _Shininess: 0.1
@@ -209,7 +209,7 @@ Material:
     - _SpecularStrength: 2
     - _Specularpower: 1
     - _SrcBlend: 1
-    - _StrongWindSpeed: 2.1150587
+    - _StrongWindSpeed: 1
     - _SwitchVGreenToRGBA: 0
     - _TEXTUREMAPS: 0
     - _TEXTURESETTINGS: 0
