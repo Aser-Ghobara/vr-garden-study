@@ -5,22 +5,55 @@ public class TrialTransitionController : MonoBehaviour
 {
     public GameObject xrOrigin;
     public Transform gardenSpawnPoint;
+    public Transform cabinSpawnPoint;
     public CanvasGroup fadeCanvasGroup;
     public GardenController gardenController;
 
     private void Awake()
     {
-        fadeCanvasGroup.alpha = 0f;
-        fadeCanvasGroup.gameObject.SetActive(false);
+        if (fadeCanvasGroup != null)
+        {
+            fadeCanvasGroup.alpha = 0f;
+            fadeCanvasGroup.gameObject.SetActive(false);
+        }
     }
 
     public void StartGardenTransition()
     {
-        StartCoroutine(TransitionSequence());
+        StartCoroutine(DoTransition());
     }
 
-    private IEnumerator TransitionSequence()
+    public void TeleportToCabin()
     {
+        if (xrOrigin == null || cabinSpawnPoint == null)
+        {
+            Debug.LogWarning("TeleportToCabin: missing xrOrigin or cabinSpawnPoint.");
+            return;
+        }
+
+        xrOrigin.transform.position = cabinSpawnPoint.position;
+    }
+
+    public IEnumerator DoTransition()
+    {
+        if (fadeCanvasGroup == null)
+        {
+            Debug.LogWarning("TrialTransitionController: fadeCanvasGroup is not assigned.");
+            yield break;
+        }
+
+        if (xrOrigin == null)
+        {
+            Debug.LogWarning("TrialTransitionController: xrOrigin is not assigned.");
+            yield break;
+        }
+
+        if (gardenSpawnPoint == null)
+        {
+            Debug.LogWarning("TrialTransitionController: gardenSpawnPoint is not assigned.");
+            yield break;
+        }
+
         float fadeDuration = 1.2f;
         float elapsed = 0f;
 
@@ -45,7 +78,7 @@ public class TrialTransitionController : MonoBehaviour
         {
             gardenController.ambienceSource.Stop();
             gardenController.ambienceSource.clip = gardenController.jungleClip;
-            gardenController.ambienceSource.loop = false;
+            gardenController.ambienceSource.loop = true;
             gardenController.ambienceSource.volume = 0.05f;
             gardenController.ambienceSource.Play();
         }
@@ -65,7 +98,5 @@ public class TrialTransitionController : MonoBehaviour
         fadeCanvasGroup.alpha = 0f;
 
         fadeCanvasGroup.gameObject.SetActive(false);
-
-        gardenController.StartSeasonEscalation();
     }
 }

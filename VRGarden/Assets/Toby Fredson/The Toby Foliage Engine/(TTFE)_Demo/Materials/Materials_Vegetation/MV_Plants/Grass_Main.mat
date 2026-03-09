@@ -560,7 +560,7 @@ Material:
     - _GlobalWindPower: 1
     - _GlobalWindPowie: 1
     - _GlobalWindStrengh: 1
-    - _GlobalWindStrength: 1
+    - _GlobalWindStrength: 0.5
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
@@ -758,7 +758,7 @@ Material:
     - _SPEED: 1
     - _SSSFalloff: 0.1
     - _ScaleA: 0.4
-    - _SeasonChangeGlobal: -0.2
+    - _SeasonChangeGlobal: 0
     - _SeasonChangeGlobal1: 0.24
     - _SeasonVertexColorR: 0
     - _SeasonVertexColorR1: 0
@@ -809,7 +809,7 @@ Material:
     - _SrcBlend: 1
     - _StrongPulse: 0
     - _StrongWind: 0
-    - _StrongWindSpeed: 1
+    - _StrongWindSpeed: 2
     - _StrongWindSpeed1: 1
     - _Stupidsway: 1
     - _SubsurfaceAmbientValue: 0.2

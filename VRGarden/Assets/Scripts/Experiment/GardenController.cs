@@ -14,6 +14,7 @@ public class GardenController : MonoBehaviour
     public Material phase1Skybox;
     public Material phase2Skybox;
     public Material phase3Skybox;
+    public Material neutralSkybox;
     
     [Header("World Lighting")]
     public Light sunLight;
@@ -100,6 +101,96 @@ public class GardenController : MonoBehaviour
         StartCoroutine(RunSeasonEscalationSequence());
     }
 
+    public void StartResponsiveSequence()
+    {
+        StartCoroutine(RunResponsiveSequence());
+    }
+
+    private IEnumerator RunResponsiveSequence()
+    {
+        if (ttfeController == null)
+        {
+            yield break;
+        }
+
+        // PHASE 2 TRANSITION (neutral → phase2)
+
+        float t = 0f;
+        while (t < 20f)
+        {
+            float p = t / 20f;
+
+            ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        if (phase2Skybox != null)
+        {
+            RenderSettings.skybox = phase2Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
+        yield return new WaitForSeconds(10f);
+
+        // PHASE 3 TRANSITION (phase2 → phase3)
+
+        t = 0f;
+        while (t < 20f)
+        {
+            float p = t / 20f;
+
+            ttfeController.SetSeason(Mathf.Lerp(1f, 2f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(2.5f, 3f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(0.7f, 1f, p));
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        if (phase3Skybox != null)
+        {
+            RenderSettings.skybox = phase3Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
+        // Allow storm to fully develop before recovery
+        float phase3HoldTime = 30f;
+        float holdElapsed = 0f;
+
+        while (holdElapsed < phase3HoldTime)
+        {
+            holdElapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        yield return new WaitForSeconds(10f);
+
+        // RECOVERY (phase3 → phase1)
+
+        t = 0f;
+        while (t < 20f)
+        {
+            float p = t / 20f;
+
+            ttfeController.SetSeason(Mathf.Lerp(2f, -1f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(3f, 2f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(1f, 0.5f, p));
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        if (phase1Skybox != null)
+        {
+            RenderSettings.skybox = phase1Skybox;
+            DynamicGI.UpdateEnvironment();
+        }
+    }
+
     private void SetActiveLight(Light activeLight)
     {
         if (sunLight != null) sunLight.gameObject.SetActive(false);
@@ -125,6 +216,53 @@ public class GardenController : MonoBehaviour
         }
 
         sfxSource.PlayOneShot(lightningClip, lightningSfxVolume);
+    }
+
+    public void ResetGardenToNeutral()
+    {
+        if (neutralSkybox != null)
+        {
+            RenderSettings.skybox = neutralSkybox;
+            DynamicGI.UpdateEnvironment();
+        }
+
+        if (rainSystem != null)
+        {
+            rainSystem.Stop();
+            rainSystem.gameObject.SetActive(false);
+        }
+
+        if (lightningSystem != null)
+        {
+            lightningSystem.Stop();
+            lightningSystem.gameObject.SetActive(false);
+        }
+
+        if (ttfeController != null)
+        {
+            ttfeController.SetSeason(0f);
+            ttfeController.SetWindSpeed(2f);
+            ttfeController.SetWindStrength(0.5f);
+        }
+
+        RenderSettings.fogDensity = 0f;
+
+        SetActiveLight(sunLight);
+
+        if (rainSystem != null)
+        {
+            rainEmission = rainSystem.emission;
+            rainEmission.rateOverTime = 0f;
+        }
+
+        if (ambienceSource != null && jungleClip != null)
+        {
+            ambienceSource.Stop();
+            ambienceSource.clip = jungleClip;
+            ambienceSource.loop = true;
+            ambienceSource.volume = 0.01f;
+            ambienceSource.Play();
+        }
     }
 
     // Runs a fixed non-responsive TTFE sequence over time for experiment control.
