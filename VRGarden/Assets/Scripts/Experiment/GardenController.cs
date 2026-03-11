@@ -35,12 +35,17 @@ public class GardenController : MonoBehaviour
 
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine lightningFlashCoroutine;
+    private const float RainLoopDuration = 20f;
 
     private void Start()
     {
         if (rainSystem != null)
         {
             rainEmission = rainSystem.emission;
+            var rainMain = rainSystem.main;
+            rainMain.duration = RainLoopDuration;
+            rainMain.loop = true;
+            rainMain.stopAction = ParticleSystemStopAction.None;
             rainSystem.gameObject.SetActive(false);
         }
 
@@ -146,10 +151,18 @@ public class GardenController : MonoBehaviour
             ttfeController.SetSeason(Mathf.Lerp(1f, 2f, p));
             ttfeController.SetWindSpeed(Mathf.Lerp(2.5f, 3f, p));
             ttfeController.SetWindStrength(Mathf.Lerp(0.7f, 1f, p));
+            RenderSettings.fogDensity = Mathf.Lerp(0f, 0.03f, p);
 
             t += Time.deltaTime;
             yield return null;
         }
+
+        // Force the full Phase 3 end-state before the hold period starts.
+        ttfeController.SetSeason(2f);
+        ttfeController.SetWindSpeed(3f);
+        ttfeController.SetWindStrength(1f);
+        RenderSettings.fogDensity = 0.03f;
+        SetActiveLight(duskLight);
 
         if (phase3Skybox != null)
         {
@@ -157,8 +170,49 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
+        // Activate storm systems
+
+        if (rainSystem != null)
+        {
+            rainSystem.gameObject.SetActive(true);
+
+            var main = rainSystem.main;
+            main.loop = true;
+            main.stopAction = ParticleSystemStopAction.None;
+
+            var emission = rainSystem.emission;
+            emission.rateOverTime = new ParticleSystem.MinMaxCurve(2000f);
+
+            if (!rainSystem.isPlaying)
+            {
+                rainSystem.Play();
+            }
+        }
+
+        if (lightningSystem != null)
+        {
+            lightningSystem.gameObject.SetActive(true);
+        }
+
+        if (ambienceSource != null && rainClip != null)
+        {
+            ambienceSource.Stop();
+            ambienceSource.clip = rainClip;
+            ambienceSource.loop = true;
+            ambienceSource.volume = ambienceVolume;
+            ambienceSource.Play();
+        }
+
+        // schedule lightning SFX
+        if (lightningFlashCoroutine != null)
+        {
+            StopCoroutine(lightningFlashCoroutine);
+        }
+
+        lightningFlashCoroutine = StartCoroutine(FlashLightningIntermittently());
+
         // Allow storm to fully develop before recovery
-        float phase3HoldTime = 30f;
+        float phase3HoldTime = 60f;
         float holdElapsed = 0f;
 
         while (holdElapsed < phase3HoldTime)
@@ -168,6 +222,34 @@ public class GardenController : MonoBehaviour
         }
 
         yield return new WaitForSeconds(10f);
+
+        if (rainSystem != null)
+        {
+            rainSystem.Stop();
+            rainSystem.gameObject.SetActive(false);
+        }
+
+        if (lightningSystem != null)
+        {
+            lightningSystem.Stop();
+            lightningSystem.gameObject.SetActive(false);
+        }
+
+        if (lightningFlashCoroutine != null)
+        {
+            StopCoroutine(lightningFlashCoroutine);
+            lightningFlashCoroutine = null;
+        }
+
+        if (ambienceSource != null)
+        {
+            ambienceSource.Stop();
+        }
+
+        if (sfxSource != null)
+        {
+            sfxSource.Stop();
+        }
 
         // RECOVERY (phase3 → phase1)
 
@@ -179,15 +261,28 @@ public class GardenController : MonoBehaviour
             ttfeController.SetSeason(Mathf.Lerp(2f, -1f, p));
             ttfeController.SetWindSpeed(Mathf.Lerp(3f, 2f, p));
             ttfeController.SetWindStrength(Mathf.Lerp(1f, 0.5f, p));
+            RenderSettings.fogDensity = Mathf.Lerp(0.03f, 0f, p);
 
             t += Time.deltaTime;
             yield return null;
         }
 
+        RenderSettings.fogDensity = 0f;
+
         if (phase1Skybox != null)
         {
             RenderSettings.skybox = phase1Skybox;
             DynamicGI.UpdateEnvironment();
+        }
+         SetActiveLight(sunLight);
+         
+        if (ambienceSource != null && jungleClip != null)
+        {
+            ambienceSource.Stop();
+            ambienceSource.clip = jungleClip;
+            ambienceSource.loop = true;
+            ambienceSource.volume = 0.05f;
+            ambienceSource.Play();
         }
     }
 
@@ -424,6 +519,11 @@ public class GardenController : MonoBehaviour
         if (rainSystem != null)
         {
             rainSystem.gameObject.SetActive(true);
+
+            var main = rainSystem.main;
+            main.loop = true;
+            main.stopAction = ParticleSystemStopAction.None;
+
             rainSystem.Play();
             rainEmission = rainSystem.emission;
         }
