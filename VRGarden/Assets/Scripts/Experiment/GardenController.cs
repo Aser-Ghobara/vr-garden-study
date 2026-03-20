@@ -32,8 +32,10 @@ public class GardenController : MonoBehaviour
     public Vector2 lightningSfxInterval = new Vector2(10f, 20f);
     public float phase3RainSoundDelay = 2f;
     public float phase3LightningDelayAfterRain = 4f;
+    public float rainStartLifetime = 8f;
 
     private ParticleSystem.EmissionModule rainEmission;
+    private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
     private const float RainLoopDuration = 20f;
 
@@ -46,6 +48,7 @@ public class GardenController : MonoBehaviour
             rainMain.duration = RainLoopDuration;
             rainMain.loop = true;
             rainMain.stopAction = ParticleSystemStopAction.None;
+            rainMain.startLifetime = rainStartLifetime;
             rainSystem.gameObject.SetActive(false);
         }
 
@@ -98,17 +101,45 @@ public class GardenController : MonoBehaviour
 
     public void StartNonResponsiveSequence()
     {
-        StartCoroutine(RunNonResponsiveSequence());
+        StartManagedGardenSequence(RunNonResponsiveSequence());
     }
 
     public void StartSeasonEscalation()
     {
-        StartCoroutine(RunSeasonEscalationSequence());
+        StartManagedGardenSequence(RunSeasonEscalationSequence());
     }
 
     public void StartResponsiveSequence()
     {
-        StartCoroutine(RunResponsiveSequence());
+        StartManagedGardenSequence(RunResponsiveSequence());
+    }
+
+    private void StartManagedGardenSequence(IEnumerator sequence)
+    {
+        StopActiveGardenSequence();
+        activeGardenSequence = StartCoroutine(RunManagedGardenSequence(sequence));
+    }
+
+    private IEnumerator RunManagedGardenSequence(IEnumerator sequence)
+    {
+        yield return StartCoroutine(sequence);
+
+        activeGardenSequence = null;
+    }
+
+    private void StopActiveGardenSequence()
+    {
+        if (activeGardenSequence != null)
+        {
+            StopCoroutine(activeGardenSequence);
+            activeGardenSequence = null;
+        }
+
+        if (lightningFlashCoroutine != null)
+        {
+            StopCoroutine(lightningFlashCoroutine);
+            lightningFlashCoroutine = null;
+        }
     }
 
     private IEnumerator RunResponsiveSequence()
@@ -141,27 +172,10 @@ public class GardenController : MonoBehaviour
 
         yield return new WaitForSeconds(10f);
 
-        // PHASE 3 TRANSITION (phase2 → phase3)
+        // PHASE 3 (phase2 → phase3): use the same escalation implementation as the season sequence.
+        float totalElapsed = 0f;
+        float nextLightningAt = float.MaxValue;
 
-        t = 0f;
-        while (t < 20f)
-        {
-            float p = t / 20f;
-
-            ttfeController.SetSeason(Mathf.Lerp(1f, 2f, p));
-            ttfeController.SetWindSpeed(Mathf.Lerp(2.5f, 3f, p));
-            ttfeController.SetWindStrength(Mathf.Lerp(0.7f, 1f, p));
-            RenderSettings.fogDensity = Mathf.Lerp(0f, 0.03f, p);
-
-            t += Time.deltaTime;
-            yield return null;
-        }
-
-        // Force the full Phase 3 end-state before the hold period starts.
-        ttfeController.SetSeason(2f);
-        ttfeController.SetWindSpeed(3f);
-        ttfeController.SetWindStrength(1f);
-        RenderSettings.fogDensity = 0.03f;
         SetActiveLight(duskLight);
 
         if (phase3Skybox != null)
@@ -170,8 +184,6 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        // Activate storm systems
-
         if (rainSystem != null)
         {
             rainSystem.gameObject.SetActive(true);
@@ -179,14 +191,10 @@ public class GardenController : MonoBehaviour
             var main = rainSystem.main;
             main.loop = true;
             main.stopAction = ParticleSystemStopAction.None;
+            main.startLifetime = rainStartLifetime;
 
-            var emission = rainSystem.emission;
-            emission.rateOverTime = new ParticleSystem.MinMaxCurve(2000f);
-
-            if (!rainSystem.isPlaying)
-            {
-                rainSystem.Play();
-            }
+            rainSystem.Play();
+            rainEmission = rainSystem.emission;
         }
 
         if (lightningSystem != null)
@@ -194,32 +202,89 @@ public class GardenController : MonoBehaviour
             lightningSystem.gameObject.SetActive(true);
         }
 
+        float rainDelayElapsed = 0f;
+        float clampedRainDelay = Mathf.Max(0f, phase3RainSoundDelay);
+        while (rainDelayElapsed < clampedRainDelay)
+        {
+            float dt = Time.deltaTime;
+            rainDelayElapsed += dt;
+            totalElapsed += dt;
+            yield return null;
+        }
+
         if (ambienceSource != null && rainClip != null)
         {
             ambienceSource.Stop();
             ambienceSource.clip = rainClip;
             ambienceSource.loop = true;
-            ambienceSource.volume = ambienceVolume;
+            ambienceSource.volume = 0f;
             ambienceSource.Play();
+            StartCoroutine(FadeAmbienceVolume(ambienceVolume, 2f));
+        }
+        else
+        {
+            Debug.LogWarning("GardenController: ambienceSource or rainClip missing at Phase 3 start.");
         }
 
-        // schedule lightning SFX
+        nextLightningAt = totalElapsed + Mathf.Max(0f, phase3LightningDelayAfterRain);
+
+        float phase3Elapsed = 0f;
+        while (phase3Elapsed < 60f)
+        {
+            float p = phase3Elapsed / 60f;
+            ttfeController.SetSeason(Mathf.Lerp(1f, 2f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 3f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 1f, p));
+            RenderSettings.fogDensity = Mathf.Lerp(0.01f, 0.03f, p);
+
+            if (rainSystem != null)
+            {
+                rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0f, 3000f, p));
+            }
+
+            if (totalElapsed >= nextLightningAt)
+            {
+                if (lightningSystem != null && lightningSystem.gameObject.activeInHierarchy)
+                {
+                    lightningSystem.Play();
+                }
+
+                PlayLightningSfx();
+                nextLightningAt += Random.Range(lightningSfxInterval.x, lightningSfxInterval.y);
+            }
+
+            phase3Elapsed += Time.deltaTime;
+            totalElapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        ttfeController.SetSeason(2f);
+        ttfeController.SetWindSpeed(3f);
+        ttfeController.SetWindStrength(1f);
+        RenderSettings.fogDensity = 0.1f;
+
+        if (rainSystem != null)
+        {
+            if (!rainSystem.gameObject.activeSelf)
+            {
+                rainSystem.gameObject.SetActive(true);
+            }
+
+            if (!rainSystem.isPlaying)
+            {
+                rainSystem.Play();
+            }
+
+            rainEmission = rainSystem.emission;
+            rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(3000f);
+        }
+
         if (lightningFlashCoroutine != null)
         {
             StopCoroutine(lightningFlashCoroutine);
         }
 
         lightningFlashCoroutine = StartCoroutine(FlashLightningIntermittently());
-
-        // Allow storm to fully develop before recovery
-        float phase3HoldTime = 60f;
-        float holdElapsed = 0f;
-
-        while (holdElapsed < phase3HoldTime)
-        {
-            holdElapsed += Time.deltaTime;
-            yield return null;
-        }
 
         yield return new WaitForSeconds(10f);
 
@@ -315,6 +380,8 @@ public class GardenController : MonoBehaviour
 
     public void ResetGardenToNeutral()
     {
+        StopActiveGardenSequence();
+
         if (neutralSkybox != null)
         {
             RenderSettings.skybox = neutralSkybox;
@@ -523,6 +590,7 @@ public class GardenController : MonoBehaviour
             var main = rainSystem.main;
             main.loop = true;
             main.stopAction = ParticleSystemStopAction.None;
+            main.startLifetime = rainStartLifetime;
 
             rainSystem.Play();
             rainEmission = rainSystem.emission;

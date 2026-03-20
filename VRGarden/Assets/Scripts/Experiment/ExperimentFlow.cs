@@ -78,7 +78,7 @@ public class ExperimentFlow : MonoBehaviour
             return;
         }
 
-        StartCoroutine(gardenController.RunNonResponsiveSequence());
+        gardenController.StartResponsiveSequence();
     }
 
     private IEnumerator StartVideoRoutine()
