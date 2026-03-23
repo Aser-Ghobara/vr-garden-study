@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GardenController : MonoBehaviour
 {
@@ -15,6 +16,11 @@ public class GardenController : MonoBehaviour
     public Material phase2Skybox;
     public Material phase3Skybox;
     public Material neutralSkybox;
+
+    [Header("Skybox Fade")]
+    public CanvasGroup fadeCanvasGroup;
+    public float skyboxFadeDuration = 0.35f;
+    public float skyboxFadeHoldDuration = 0.05f;
     
     [Header("World Lighting")]
     public Light sunLight;
@@ -38,6 +44,7 @@ public class GardenController : MonoBehaviour
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
+    private Coroutine skyboxFadeCoroutine;
     private const float RainLoopDuration = 20f;
 
     private void Start()
@@ -47,6 +54,7 @@ public class GardenController : MonoBehaviour
         SetRainGroupActive(false);
 
         SetLightningGroupActive(false);
+        InitializeFadeCanvas();
 
         // Ensure controlled audio startup behavior.
         if (ambienceSource != null)
@@ -131,6 +139,14 @@ public class GardenController : MonoBehaviour
             StopCoroutine(lightningFlashCoroutine);
             lightningFlashCoroutine = null;
         }
+
+        if (skyboxFadeCoroutine != null)
+        {
+            StopCoroutine(skyboxFadeCoroutine);
+            skyboxFadeCoroutine = null;
+        }
+
+        InitializeFadeCanvas();
     }
 
     private IEnumerator RunResponsiveSequence()
@@ -157,8 +173,7 @@ public class GardenController : MonoBehaviour
 
         if (phase2Skybox != null)
         {
-            RenderSettings.skybox = phase2Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
         }
 
         yield return new WaitForSeconds(10f);
@@ -167,12 +182,10 @@ public class GardenController : MonoBehaviour
         float totalElapsed = 0f;
         float nextLightningAt = float.MaxValue;
 
-        SetActiveLight(duskLight);
 
         if (phase3Skybox != null)
         {
-            RenderSettings.skybox = phase3Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase3Skybox, () => SetActiveLight(duskLight)));
         }
 
         SetRainGroupActive(true);
@@ -294,10 +307,12 @@ public class GardenController : MonoBehaviour
 
         if (phase1Skybox != null)
         {
-            RenderSettings.skybox = phase1Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () => SetActiveLight(sunLight)));
         }
-         SetActiveLight(sunLight);
+        else
+        {
+            SetActiveLight(sunLight);
+        }
          
         if (ambienceSource != null && jungleClip != null)
         {
@@ -342,8 +357,7 @@ public class GardenController : MonoBehaviour
 
         if (neutralSkybox != null)
         {
-            RenderSettings.skybox = neutralSkybox;
-            DynamicGI.UpdateEnvironment();
+            SwapSkyboxWithFadeImmediate(neutralSkybox);
         }
 
         StopRainSystems();
@@ -429,8 +443,7 @@ public class GardenController : MonoBehaviour
 
         if (phase1Skybox != null)
         {
-            RenderSettings.skybox = phase1Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox));
         }
 
         SetRainGroupActive(false);
@@ -473,8 +486,7 @@ public class GardenController : MonoBehaviour
 
         if (phase2Skybox != null)
         {
-            RenderSettings.skybox = phase2Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
         }
 
         SetRainGroupActive(false);
@@ -512,8 +524,7 @@ public class GardenController : MonoBehaviour
         // 1) Swap skybox first.
         if (phase3Skybox != null)
         {
-            RenderSettings.skybox = phase3Skybox;
-            DynamicGI.UpdateEnvironment();
+            yield return StartCoroutine(SwapSkyboxWithFade(phase3Skybox));
         }
 
         SetRainGroupActive(true);
@@ -638,6 +649,110 @@ public class GardenController : MonoBehaviour
         }
 
         ambienceSource.volume = targetVolume;
+    }
+
+    private void InitializeFadeCanvas()
+    {
+        if (fadeCanvasGroup == null)
+        {
+            return;
+        }
+
+        fadeCanvasGroup.alpha = 0f;
+        fadeCanvasGroup.gameObject.SetActive(false);
+    }
+
+    private IEnumerator SwapSkyboxWithFade(Material targetSkybox)
+    {
+        yield return StartCoroutine(SwapSkyboxWithFade(targetSkybox, null));
+    }
+
+    private IEnumerator SwapSkyboxWithFade(Material targetSkybox, System.Action onBlack)
+    {
+        if (targetSkybox == null)
+        {
+            yield break;
+        }
+
+        if (fadeCanvasGroup == null)
+        {
+            ApplySkybox(targetSkybox);
+            yield break;
+        }
+
+        if (skyboxFadeCoroutine != null)
+        {
+            StopCoroutine(skyboxFadeCoroutine);
+            skyboxFadeCoroutine = null;
+        }
+
+        yield return StartCoroutine(FadeCanvasAlpha(0f, 1f, skyboxFadeDuration));
+        ApplySkybox(targetSkybox);
+        onBlack?.Invoke();
+
+        if (skyboxFadeHoldDuration > 0f)
+        {
+            yield return new WaitForSeconds(skyboxFadeHoldDuration);
+        }
+
+        yield return StartCoroutine(FadeCanvasAlpha(1f, 0f, skyboxFadeDuration));
+        skyboxFadeCoroutine = null;
+    }
+
+    private void SwapSkyboxWithFadeImmediate(Material targetSkybox)
+    {
+        if (targetSkybox == null)
+        {
+            return;
+        }
+
+        if (fadeCanvasGroup == null)
+        {
+            ApplySkybox(targetSkybox);
+            return;
+        }
+
+        if (skyboxFadeCoroutine != null)
+        {
+            StopCoroutine(skyboxFadeCoroutine);
+        }
+
+        skyboxFadeCoroutine = StartCoroutine(SwapSkyboxWithFade(targetSkybox));
+    }
+
+    private IEnumerator FadeCanvasAlpha(float startAlpha, float endAlpha, float duration)
+    {
+        if (fadeCanvasGroup == null)
+        {
+            yield break;
+        }
+
+        fadeCanvasGroup.gameObject.SetActive(true);
+        fadeCanvasGroup.alpha = startAlpha;
+
+        float elapsed = 0f;
+        float clampedDuration = Mathf.Max(0.01f, duration);
+
+        while (elapsed < clampedDuration)
+        {
+            float t = elapsed / clampedDuration;
+            fadeCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        fadeCanvasGroup.alpha = endAlpha;
+
+        if (Mathf.Approximately(endAlpha, 0f))
+        {
+            fadeCanvasGroup.gameObject.SetActive(false);
+        }
+    }
+
+    private void ApplySkybox(Material targetSkybox)
+    {
+        RenderSettings.skybox = targetSkybox;
+        DynamicGI.UpdateEnvironment();
     }
 
     private void CachePrimaryRainSystem()
