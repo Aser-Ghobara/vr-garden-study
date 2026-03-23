@@ -24,6 +24,7 @@ public class ExperimentFlow : MonoBehaviour
     [Tooltip("Assign the GardenController component on your garden root object.")]
     public GardenController gardenController;
     public HapticVestController hapticVestController;
+    public ExternalHapticsController externalHapticsController;
     public VideoPhaseController videoPhaseController;
 
     public TrialTransitionController transitionController;
@@ -173,6 +174,8 @@ public class ExperimentFlow : MonoBehaviour
             gardenController.ResetGardenToNeutral();
         }
 
+        StopExternalHaptics();
+
         if (reflectionGroup != null)
         {
             reflectionGroup.SetActive(false);
@@ -230,6 +233,17 @@ public class ExperimentFlow : MonoBehaviour
             gardenGroup.SetActive(true);
         }
 
+        if (trial.haptic == TrialManager.HapticType.Haptic)
+        {
+            Debug.Log("Haptic trial: starting external haptics.");
+            StartExternalHaptics();
+        }
+        else
+        {
+            Debug.Log("No-haptic trial: external haptics remain stopped.");
+            StopExternalHaptics();
+        }
+
         if (trial.responsiveness == TrialManager.ResponsivenessType.NonResponsive)
         {
             Debug.Log("Non-responsive trial: garden stays neutral.");
@@ -238,5 +252,24 @@ public class ExperimentFlow : MonoBehaviour
 
         Debug.Log("Responsive trial: running garden sequence.");
         gardenController.StartResponsiveSequence();
+    }
+
+    private void StartExternalHaptics()
+    {
+        if (externalHapticsController != null)
+        {
+            externalHapticsController.StartHapticsExample();
+            return;
+        }
+
+        Debug.LogWarning("ExperimentFlow: ExternalHapticsController is not assigned.");
+    }
+
+    private void StopExternalHaptics()
+    {
+        if (externalHapticsController != null)
+        {
+            externalHapticsController.StopHaptics();
+        }
     }
 }
