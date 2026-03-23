@@ -9,8 +9,8 @@ public class GardenController : MonoBehaviour
     // - Shift season states and vegetation growth.
     // - Adjust color grading/material parameters based on affect.
     public TobyFredson.TobyGlobalShadersController ttfeController;
-    public ParticleSystem rainSystem;
-    public ParticleSystem lightningSystem;
+    public GameObject rainGroup;
+    public GameObject lightningGroup;
     public Material phase1Skybox;
     public Material phase2Skybox;
     public Material phase3Skybox;
@@ -34,6 +34,7 @@ public class GardenController : MonoBehaviour
     public float phase3LightningDelayAfterRain = 4f;
     public float rainStartLifetime = 8f;
 
+    private ParticleSystem rainSystem;
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
@@ -41,21 +42,11 @@ public class GardenController : MonoBehaviour
 
     private void Start()
     {
-        if (rainSystem != null)
-        {
-            rainEmission = rainSystem.emission;
-            var rainMain = rainSystem.main;
-            rainMain.duration = RainLoopDuration;
-            rainMain.loop = true;
-            rainMain.stopAction = ParticleSystemStopAction.None;
-            rainMain.startLifetime = rainStartLifetime;
-            rainSystem.gameObject.SetActive(false);
-        }
+        CachePrimaryRainSystem();
+        ConfigureRainSystem();
+        SetRainGroupActive(false);
 
-        if (lightningSystem != null)
-        {
-            lightningSystem.gameObject.SetActive(false);
-        }
+        SetLightningGroupActive(false);
 
         // Ensure controlled audio startup behavior.
         if (ambienceSource != null)
@@ -184,23 +175,11 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        if (rainSystem != null)
-        {
-            rainSystem.gameObject.SetActive(true);
+        SetRainGroupActive(true);
+        ConfigureRainSystem();
+        PlayRainSystems();
 
-            var main = rainSystem.main;
-            main.loop = true;
-            main.stopAction = ParticleSystemStopAction.None;
-            main.startLifetime = rainStartLifetime;
-
-            rainSystem.Play();
-            rainEmission = rainSystem.emission;
-        }
-
-        if (lightningSystem != null)
-        {
-            lightningSystem.gameObject.SetActive(true);
-        }
+        SetLightningGroupActive(true);
 
         float rainDelayElapsed = 0f;
         float clampedRainDelay = Mathf.Max(0f, phase3RainSoundDelay);
@@ -237,16 +216,13 @@ public class GardenController : MonoBehaviour
             ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 1f, p));
             RenderSettings.fogDensity = Mathf.Lerp(0.01f, 0.03f, p);
 
-            if (rainSystem != null)
-            {
-                rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0f, 3000f, p));
-            }
+            SetRainEmissionRate(Mathf.Lerp(0f, 3000f, p));
 
             if (totalElapsed >= nextLightningAt)
             {
-                if (lightningSystem != null && lightningSystem.gameObject.activeInHierarchy)
+                if (IsLightningGroupActive())
                 {
-                    lightningSystem.Play();
+                    PlayLightningSystems();
                 }
 
                 PlayLightningSfx();
@@ -263,21 +239,9 @@ public class GardenController : MonoBehaviour
         ttfeController.SetWindStrength(1f);
         RenderSettings.fogDensity = 0.1f;
 
-        if (rainSystem != null)
-        {
-            if (!rainSystem.gameObject.activeSelf)
-            {
-                rainSystem.gameObject.SetActive(true);
-            }
-
-            if (!rainSystem.isPlaying)
-            {
-                rainSystem.Play();
-            }
-
-            rainEmission = rainSystem.emission;
-            rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(3000f);
-        }
+        SetRainGroupActive(true);
+        PlayRainSystems();
+        SetRainEmissionRate(3000f);
 
         if (lightningFlashCoroutine != null)
         {
@@ -288,17 +252,11 @@ public class GardenController : MonoBehaviour
 
         yield return new WaitForSeconds(10f);
 
-        if (rainSystem != null)
-        {
-            rainSystem.Stop();
-            rainSystem.gameObject.SetActive(false);
-        }
+        StopRainSystems();
+        SetRainGroupActive(false);
 
-        if (lightningSystem != null)
-        {
-            lightningSystem.Stop();
-            lightningSystem.gameObject.SetActive(false);
-        }
+        StopLightningSystems();
+        SetLightningGroupActive(false);
 
         if (lightningFlashCoroutine != null)
         {
@@ -388,17 +346,11 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        if (rainSystem != null)
-        {
-            rainSystem.Stop();
-            rainSystem.gameObject.SetActive(false);
-        }
+        StopRainSystems();
+        SetRainGroupActive(false);
 
-        if (lightningSystem != null)
-        {
-            lightningSystem.Stop();
-            lightningSystem.gameObject.SetActive(false);
-        }
+        StopLightningSystems();
+        SetLightningGroupActive(false);
 
         if (ttfeController != null)
         {
@@ -411,11 +363,7 @@ public class GardenController : MonoBehaviour
 
         SetActiveLight(sunLight);
 
-        if (rainSystem != null)
-        {
-            rainEmission = rainSystem.emission;
-            rainEmission.rateOverTime = 0f;
-        }
+        SetRainEmissionRate(0f);
 
         if (ambienceSource != null && jungleClip != null)
         {
@@ -485,15 +433,9 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        if (rainSystem != null)
-        {
-            rainSystem.gameObject.SetActive(false);
-        }
+        SetRainGroupActive(false);
 
-        if (lightningSystem != null)
-        {
-            lightningSystem.gameObject.SetActive(false);
-        }
+        SetLightningGroupActive(false);
 
         ttfeController.SetSeason(-1f);
         ttfeController.SetWindSpeed(1f);
@@ -503,21 +445,18 @@ public class GardenController : MonoBehaviour
 
         RenderSettings.fogDensity = 0f;
 
-        if (rainSystem != null)
-        {
-            rainEmission.rateOverTime = 0f;
-        }
+        SetRainEmissionRate(0f);
 
         while (totalElapsed < 30f)
         {
-            if (rainSystem != null && rainSystem.gameObject.activeSelf)
+            if (IsRainGroupActive())
             {
-                rainSystem.gameObject.SetActive(false);
+                SetRainGroupActive(false);
             }
 
-            if (lightningSystem != null && lightningSystem.gameObject.activeSelf)
+            if (IsLightningGroupActive())
             {
-                lightningSystem.gameObject.SetActive(false);
+                SetLightningGroupActive(false);
             }
 
             totalElapsed += Time.deltaTime;
@@ -538,27 +477,21 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        if (rainSystem != null)
-        {
-            rainSystem.gameObject.SetActive(false);
-        }
+        SetRainGroupActive(false);
 
-        if (lightningSystem != null)
-        {
-            lightningSystem.gameObject.SetActive(false);
-        }
+        SetLightningGroupActive(false);
 
         float phase2Elapsed = 0f;
         while (phase2Elapsed < 30f)
         {
-            if (rainSystem != null && rainSystem.gameObject.activeSelf)
+            if (IsRainGroupActive())
             {
-                rainSystem.gameObject.SetActive(false);
+                SetRainGroupActive(false);
             }
 
-            if (lightningSystem != null && lightningSystem.gameObject.activeSelf)
+            if (IsLightningGroupActive())
             {
-                lightningSystem.gameObject.SetActive(false);
+                SetLightningGroupActive(false);
             }
 
             float t = phase2Elapsed / 30f;
@@ -583,23 +516,11 @@ public class GardenController : MonoBehaviour
             DynamicGI.UpdateEnvironment();
         }
 
-        if (rainSystem != null)
-        {
-            rainSystem.gameObject.SetActive(true);
+        SetRainGroupActive(true);
+        ConfigureRainSystem();
+        PlayRainSystems();
 
-            var main = rainSystem.main;
-            main.loop = true;
-            main.stopAction = ParticleSystemStopAction.None;
-            main.startLifetime = rainStartLifetime;
-
-            rainSystem.Play();
-            rainEmission = rainSystem.emission;
-        }
-
-        if (lightningSystem != null)
-        {
-            lightningSystem.gameObject.SetActive(true);
-        }
+        SetLightningGroupActive(true);
 
         // 2) Wait a bit before starting rain ambience.
         float rainDelayElapsed = 0f;
@@ -639,16 +560,13 @@ public class GardenController : MonoBehaviour
 
             RenderSettings.fogDensity = Mathf.Lerp(0.01f, 0.03f, t);
 
-            if (rainSystem != null)
-            {
-                rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0f, 3000f, t));
-            }
+            SetRainEmissionRate(Mathf.Lerp(0f, 3000f, t));
 
             if (totalElapsed >= nextLightningAt)
             {
-                if (lightningSystem != null && lightningSystem.gameObject.activeInHierarchy)
+                if (IsLightningGroupActive())
                 {
-                    lightningSystem.Play();
+                    PlayLightningSystems();
                 }
 
                 // Play SFX with particle event when available, or independently if no lightning system exists.
@@ -668,21 +586,9 @@ public class GardenController : MonoBehaviour
 
         RenderSettings.fogDensity = 0.1f;
 
-        if (rainSystem != null)
-        {
-            if (!rainSystem.gameObject.activeSelf)
-            {
-                rainSystem.gameObject.SetActive(true);
-            }
-
-            if (!rainSystem.isPlaying)
-            {
-                rainSystem.Play();
-            }
-
-            rainEmission = rainSystem.emission;
-            rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(3000f);
-        }
+        SetRainGroupActive(true);
+        PlayRainSystems();
+        SetRainEmissionRate(3000f);
 
         if (lightningFlashCoroutine != null)
         {
@@ -699,13 +605,13 @@ public class GardenController : MonoBehaviour
             yield return new WaitForSeconds(Random.Range(lightningSfxInterval.x, lightningSfxInterval.y));
 
             bool playedVisual = false;
-            if (lightningSystem != null && lightningSystem.gameObject.activeInHierarchy)
+            if (IsLightningGroupActive())
             {
-                lightningSystem.Play();
+                PlayLightningSystems();
                 playedVisual = true;
             }
 
-            if (playedVisual || lightningSystem == null)
+            if (playedVisual || lightningGroup == null)
             {
                 PlayLightningSfx();
             }
@@ -732,5 +638,112 @@ public class GardenController : MonoBehaviour
         }
 
         ambienceSource.volume = targetVolume;
+    }
+
+    private void CachePrimaryRainSystem()
+    {
+        ParticleSystem[] rainSystems = GetRainSystems();
+        rainSystem = rainSystems.Length > 0 ? rainSystems[0] : null;
+    }
+
+    private void ConfigureRainSystem()
+    {
+        CachePrimaryRainSystem();
+
+        if (rainSystem != null)
+        {
+            var rainMain = rainSystem.main;
+            rainMain.duration = RainLoopDuration;
+            rainMain.loop = true;
+            rainMain.stopAction = ParticleSystemStopAction.None;
+            rainMain.startLifetime = rainStartLifetime;
+            rainEmission = rainSystem.emission;
+        }
+    }
+
+    private void PlayRainSystems()
+    {
+        foreach (ParticleSystem rainSystem in GetRainSystems())
+        {
+            if (!rainSystem.isPlaying)
+            {
+                rainSystem.Play();
+            }
+        }
+    }
+
+    private void StopRainSystems()
+    {
+        foreach (ParticleSystem rainSystem in GetRainSystems())
+        {
+            rainSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+    }
+
+    private void SetRainEmissionRate(float rate)
+    {
+        CachePrimaryRainSystem();
+
+        if (rainSystem != null)
+        {
+            rainEmission = rainSystem.emission;
+            rainEmission.rateOverTime = new ParticleSystem.MinMaxCurve(rate);
+        }
+    }
+
+    private ParticleSystem[] GetRainSystems()
+    {
+        return rainGroup != null
+            ? rainGroup.GetComponentsInChildren<ParticleSystem>(true)
+            : System.Array.Empty<ParticleSystem>();
+    }
+
+    private void SetRainGroupActive(bool isActive)
+    {
+        if (rainGroup != null && rainGroup.activeSelf != isActive)
+        {
+            rainGroup.SetActive(isActive);
+        }
+    }
+
+    private bool IsRainGroupActive()
+    {
+        return rainGroup != null && rainGroup.activeSelf;
+    }
+
+    private ParticleSystem[] GetLightningSystems()
+    {
+        return lightningGroup != null
+            ? lightningGroup.GetComponentsInChildren<ParticleSystem>(true)
+            : System.Array.Empty<ParticleSystem>();
+    }
+
+    private void PlayLightningSystems()
+    {
+        foreach (ParticleSystem lightningSystem in GetLightningSystems())
+        {
+            lightningSystem.Play();
+        }
+    }
+
+    private void StopLightningSystems()
+    {
+        foreach (ParticleSystem lightningSystem in GetLightningSystems())
+        {
+            lightningSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        }
+    }
+
+    private void SetLightningGroupActive(bool isActive)
+    {
+        if (lightningGroup != null && lightningGroup.activeSelf != isActive)
+        {
+            lightningGroup.SetActive(isActive);
+        }
+    }
+
+    private bool IsLightningGroupActive()
+    {
+        return lightningGroup != null && lightningGroup.activeSelf;
     }
 }
