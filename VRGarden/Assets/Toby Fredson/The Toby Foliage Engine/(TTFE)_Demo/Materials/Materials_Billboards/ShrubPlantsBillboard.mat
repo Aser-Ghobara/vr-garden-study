@@ -175,7 +175,7 @@ Material:
     - _FlutterIntensity: 1
     - _FlutterTangentON: 0
     - _GentleBreeze: 0
-    - _GlobalWindStrength: 0.5754351
+    - _GlobalWindStrength: 0.5018273
     - _Gloss: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
@@ -208,7 +208,7 @@ Material:
     - _RandomContrastOnOff: 0
     - _ReceiveShadows: 1
     - _SEASONSETTINGS: 0
-    - _SeasonChangeGlobal: 1.1508702
+    - _SeasonChangeGlobal: -0.9890362
     - _SeasonChnageA: 0
     - _SeasonChnageB: 0
     - _SeasonVertexColorR: 0
@@ -221,7 +221,7 @@ Material:
     - _SpecularHighlights: 1
     - _SpecularPower: 0
     - _SrcBlend: 1
-    - _StrongWindSpeed: 2.1508703
+    - _StrongWindSpeed: 2.0036545
     - _TEXTUREMAPS: 0
     - _TEXTURESETTINGS: 0
     - _TTFELIGHTTREEBILLBOARDSHADER: 0
