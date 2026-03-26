@@ -9,6 +9,39 @@ public class VideoPhaseController : MonoBehaviour
     public GameObject reflectionGroup;
     public GardenController gardenController;
 
+    [Header("Head-Locked Video")]
+    public Transform targetCamera;
+    public float distanceFromCamera = 2f;
+    public float verticalOffset = 0f;
+    public float horizontalOffset = 0f;
+    public Vector3 rotationOffsetEuler;
+
+    private void LateUpdate()
+    {
+        if (videoGroup == null || !videoGroup.activeInHierarchy || videoPlayer == null)
+        {
+            return;
+        }
+
+        Transform cameraTransform = GetTargetCamera();
+        if (cameraTransform == null)
+        {
+            return;
+        }
+
+        Transform screenTransform = videoPlayer.transform;
+        Vector3 desiredPosition =
+            cameraTransform.position +
+            cameraTransform.forward * distanceFromCamera +
+            cameraTransform.up * verticalOffset +
+            cameraTransform.right * horizontalOffset;
+
+        screenTransform.position = desiredPosition;
+        screenTransform.rotation =
+            Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
+            Quaternion.Euler(rotationOffsetEuler);
+    }
+
     public void StartVideoPhase()
     {
         if (gardenController != null && gardenController.ambienceSource != null)
@@ -73,5 +106,20 @@ public class VideoPhaseController : MonoBehaviour
 
         videoGroup.SetActive(false);
         reflectionGroup.SetActive(true);
+    }
+
+    private Transform GetTargetCamera()
+    {
+        if (targetCamera != null)
+        {
+            return targetCamera;
+        }
+
+        if (Camera.main != null)
+        {
+            return Camera.main.transform;
+        }
+
+        return null;
     }
 }
