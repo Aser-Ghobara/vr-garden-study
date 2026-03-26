@@ -17,6 +17,7 @@ public class VideoPhaseController : MonoBehaviour
     public Vector3 rotationOffsetEuler;
 
     [Header("Head-Locked Reflection")]
+    public Transform reflectionFollowTarget;
     public float reflectionDistanceFromCamera = 1.5f;
     public float reflectionVerticalOffset = 0f;
     public float reflectionHorizontalOffset = 0f;
@@ -146,7 +147,12 @@ public class VideoPhaseController : MonoBehaviour
             return;
         }
 
-        Transform reflectionTransform = reflectionGroup.transform;
+        Transform reflectionTransform = GetReflectionFollowTarget();
+        if (reflectionTransform == null)
+        {
+            return;
+        }
+
         Vector3 desiredPosition =
             cameraTransform.position +
             cameraTransform.forward * reflectionDistanceFromCamera +
@@ -157,5 +163,26 @@ public class VideoPhaseController : MonoBehaviour
         reflectionTransform.rotation =
             Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
             Quaternion.Euler(reflectionRotationOffsetEuler);
+    }
+
+    private Transform GetReflectionFollowTarget()
+    {
+        if (reflectionFollowTarget != null)
+        {
+            return reflectionFollowTarget;
+        }
+
+        if (reflectionGroup == null)
+        {
+            return null;
+        }
+
+        Canvas reflectionCanvas = reflectionGroup.GetComponentInChildren<Canvas>(true);
+        if (reflectionCanvas != null)
+        {
+            return reflectionCanvas.transform;
+        }
+
+        return reflectionGroup.transform;
     }
 }
