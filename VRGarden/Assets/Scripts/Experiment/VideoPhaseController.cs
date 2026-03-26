@@ -16,16 +16,24 @@ public class VideoPhaseController : MonoBehaviour
     public float horizontalOffset = 0f;
     public Vector3 rotationOffsetEuler;
 
+    [Header("Head-Locked Reflection")]
+    public float reflectionDistanceFromCamera = 1.5f;
+    public float reflectionVerticalOffset = 0f;
+    public float reflectionHorizontalOffset = 0f;
+    public Vector3 reflectionRotationOffsetEuler;
+
     private void LateUpdate()
     {
         if (videoGroup == null || !videoGroup.activeInHierarchy || videoPlayer == null)
         {
+            UpdateReflectionGroupHeadLock();
             return;
         }
 
         Transform cameraTransform = GetTargetCamera();
         if (cameraTransform == null)
         {
+            UpdateReflectionGroupHeadLock();
             return;
         }
 
@@ -40,6 +48,8 @@ public class VideoPhaseController : MonoBehaviour
         screenTransform.rotation =
             Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
             Quaternion.Euler(rotationOffsetEuler);
+
+        UpdateReflectionGroupHeadLock();
     }
 
     public void StartVideoPhase()
@@ -121,5 +131,31 @@ public class VideoPhaseController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void UpdateReflectionGroupHeadLock()
+    {
+        if (reflectionGroup == null || !reflectionGroup.activeInHierarchy)
+        {
+            return;
+        }
+
+        Transform cameraTransform = GetTargetCamera();
+        if (cameraTransform == null)
+        {
+            return;
+        }
+
+        Transform reflectionTransform = reflectionGroup.transform;
+        Vector3 desiredPosition =
+            cameraTransform.position +
+            cameraTransform.forward * reflectionDistanceFromCamera +
+            cameraTransform.up * reflectionVerticalOffset +
+            cameraTransform.right * reflectionHorizontalOffset;
+
+        reflectionTransform.position = desiredPosition;
+        reflectionTransform.rotation =
+            Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
+            Quaternion.Euler(reflectionRotationOffsetEuler);
     }
 }
