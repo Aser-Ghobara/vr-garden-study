@@ -40,11 +40,15 @@ public class GardenController : MonoBehaviour
     public float phase3LightningDelayAfterRain = 4f;
     public float rainStartLifetime = 8f;
 
+    [Header("Haptics")]
+    public HapticsController hapticsController;
+
     private ParticleSystem rainSystem;
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
     private Coroutine skyboxFadeCoroutine;
+    private string recoveryHapticEventName;
     private const float RainLoopDuration = 20f;
 
     private void Start()
@@ -111,6 +115,11 @@ public class GardenController : MonoBehaviour
     public void StartResponsiveSequence()
     {
         StartManagedGardenSequence(RunResponsiveSequence());
+    }
+
+    public void ConfigureRecoveryHaptics(string eventName)
+    {
+        recoveryHapticEventName = eventName;
     }
 
     private void StartManagedGardenSequence(IEnumerator sequence)
@@ -288,6 +297,7 @@ public class GardenController : MonoBehaviour
         }
 
         // RECOVERY (phase3 → phase1)
+        PlayRecoveryHapticIfConfigured();
 
         t = 0f;
         while (t < 20f)
@@ -322,6 +332,8 @@ public class GardenController : MonoBehaviour
             ambienceSource.volume = 0.05f;
             ambienceSource.Play();
         }
+
+        recoveryHapticEventName = null;
     }
 
     private void SetActiveLight(Light activeLight)
@@ -354,6 +366,7 @@ public class GardenController : MonoBehaviour
     public void ResetGardenToNeutral()
     {
         StopActiveGardenSequence();
+        recoveryHapticEventName = null;
 
         if (neutralSkybox != null)
         {
@@ -753,6 +766,22 @@ public class GardenController : MonoBehaviour
     {
         RenderSettings.skybox = targetSkybox;
         DynamicGI.UpdateEnvironment();
+    }
+
+    private void PlayRecoveryHapticIfConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(recoveryHapticEventName))
+        {
+            return;
+        }
+
+        if (hapticsController == null)
+        {
+            Debug.LogWarning("GardenController: HapticsController is not assigned for recovery haptics.");
+            return;
+        }
+
+        hapticsController.PlayHaptic(recoveryHapticEventName);
     }
 
     private void CachePrimaryRainSystem()

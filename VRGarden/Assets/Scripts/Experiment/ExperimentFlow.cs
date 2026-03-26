@@ -23,6 +23,7 @@ public class ExperimentFlow : MonoBehaviour
 
     [Tooltip("Assign the GardenController component on your garden root object.")]
     public GardenController gardenController;
+    public HapticsController hapticsController;
     public HapticVestController hapticVestController;
     public ExternalHapticsController externalHapticsController;
     public VideoPhaseController videoPhaseController;
@@ -35,7 +36,15 @@ public class ExperimentFlow : MonoBehaviour
     [Tooltip("Optional: assign the Start Garden button to enable it after reflection recording.")]
     public Button startGardenButton;
 
+    [Header("bHaptics Events")]
+    [Tooltip("Plays during the recovery phase for responsive + haptic trials.")]
+    public string responsiveRecoveryHapticEventName;
+
+    [Tooltip("Plays 5 seconds after arriving in the garden for non-responsive + haptic trials.")]
+    public string nonResponsiveGardenHapticEventName;
+
     private Coroutine startVideoRoutine;
+    private Coroutine delayedHapticRoutine;
 
     private void Start()
     {
@@ -172,9 +181,10 @@ public class ExperimentFlow : MonoBehaviour
         if (gardenController != null)
         {
             gardenController.ResetGardenToNeutral();
+            gardenController.ConfigureRecoveryHaptics(null);
         }
 
-        StopExternalHaptics();
+        StopAllHaptics();
 
         if (reflectionGroup != null)
         {
@@ -233,19 +243,29 @@ public class ExperimentFlow : MonoBehaviour
             gardenGroup.SetActive(true);
         }
 
-        if (trial.haptic == TrialManager.HapticType.Haptic)
+        if (trial.haptic == TrialManager.HapticType.Haptic &&
+            trial.responsiveness == TrialManager.ResponsivenessType.Responsive)
         {
-            Debug.Log("Haptic trial: starting external haptics.");
-            StartExternalHaptics();
+            if (gardenController != null)
+            {
+                gardenController.ConfigureRecoveryHaptics(responsiveRecoveryHapticEventName);
+            }
         }
         else
         {
-            Debug.Log("No-haptic trial: external haptics remain stopped.");
-            StopExternalHaptics();
+            if (gardenController != null)
+            {
+                gardenController.ConfigureRecoveryHaptics(null);
+            }
         }
 
         if (trial.responsiveness == TrialManager.ResponsivenessType.NonResponsive)
         {
+            if (trial.haptic == TrialManager.HapticType.Haptic)
+            {
+                StartNonResponsiveDelayedHaptic();
+            }
+
             Debug.Log("Non-responsive trial: garden stays neutral.");
             yield break;
         }
@@ -254,19 +274,51 @@ public class ExperimentFlow : MonoBehaviour
         gardenController.StartResponsiveSequence();
     }
 
-    private void StartExternalHaptics()
+    private void StartNonResponsiveDelayedHaptic()
     {
-        if (externalHapticsController != null)
+        if (delayedHapticRoutine != null)
         {
-            externalHapticsController.StartHapticsExample();
-            return;
+            StopCoroutine(delayedHapticRoutine);
         }
 
-        Debug.LogWarning("ExperimentFlow: ExternalHapticsController is not assigned.");
+        delayedHapticRoutine = StartCoroutine(PlayNonResponsiveHapticAfterDelay());
     }
 
-    private void StopExternalHaptics()
+    private IEnumerator PlayNonResponsiveHapticAfterDelay()
     {
+        yield return new WaitForSeconds(5f);
+
+        if (hapticsController == null)
+        {
+            Debug.LogWarning("ExperimentFlow: HapticsController is not assigned.");
+            delayedHapticRoutine = null;
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(nonResponsiveGardenHapticEventName))
+        {
+            Debug.LogWarning("ExperimentFlow: Non-responsive garden haptic event name is empty.");
+            delayedHapticRoutine = null;
+            yield break;
+        }
+
+        hapticsController.PlayHaptic(nonResponsiveGardenHapticEventName);
+        delayedHapticRoutine = null;
+    }
+
+    private void StopAllHaptics()
+    {
+        if (delayedHapticRoutine != null)
+        {
+            StopCoroutine(delayedHapticRoutine);
+            delayedHapticRoutine = null;
+        }
+
+        if (hapticsController != null)
+        {
+            hapticsController.StopAllHaptics();
+        }
+
         if (externalHapticsController != null)
         {
             externalHapticsController.StopHaptics();
