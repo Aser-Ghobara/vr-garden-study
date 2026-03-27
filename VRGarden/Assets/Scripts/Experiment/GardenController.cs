@@ -21,6 +21,12 @@ public class GardenController : MonoBehaviour
     public CanvasGroup fadeCanvasGroup;
     public float skyboxFadeDuration = 0.35f;
     public float skyboxFadeHoldDuration = 0.05f;
+
+    [Header("Fade Debug")]
+    public bool enableFadeDebugLogging = false;
+    public bool preferRuntimeCameraFadeOverlay = true;
+    public float runtimeFadeOverlayDistance = 0.15f;
+    public float runtimeFadeOverlayMargin = 1.25f;
     
     [Header("World Lighting")]
     public Light sunLight;
@@ -48,8 +54,14 @@ public class GardenController : MonoBehaviour
     private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
     private Coroutine skyboxFadeCoroutine;
+    private CanvasGroup activeFadeCanvasGroup;
+    private CanvasGroup runtimeFadeCanvasGroup;
+    private Canvas runtimeFadeCanvas;
+    private RectTransform runtimeFadeCanvasRect;
     private string recoveryHapticEventName;
     private const float RainLoopDuration = 20f;
+
+    public bool IsSequenceRunning => activeGardenSequence != null;
 
     private void Start()
     {
@@ -165,36 +177,74 @@ public class GardenController : MonoBehaviour
             yield break;
         }
 
-        // PHASE 2 TRANSITION (neutral → phase2)
+        const float phase1Duration = 15f;
+        const float phase2Duration = 15f;
+        const float phase3Duration = 25f;
+        const float recoveryDuration = 25f;
+
+        // PHASE 1 (0-15s): calm baseline.
+        if (phase1Skybox != null)
+        {
+            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () => SetActiveLight(sunLight)));
+        }
+        else
+        {
+            SetActiveLight(sunLight);
+        }
+
+        SetRainGroupActive(false);
+        StopRainSystems();
+        SetLightningGroupActive(false);
+        StopLightningSystems();
+
+        ttfeController.SetSeason(0f);
+        ttfeController.SetWindSpeed(2f);
+        ttfeController.SetWindStrength(0.5f);
+        RenderSettings.fogDensity = 0f;
+        SetRainEmissionRate(0f);
 
         float t = 0f;
-        while (t < 20f)
+        while (t < phase1Duration)
         {
-            float p = t / 20f;
-
-            ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
-            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
-            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
-
             t += Time.deltaTime;
             yield return null;
         }
 
+        // PHASE 2 (15-30s): moderate escalation.
         if (phase2Skybox != null)
         {
             yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
         }
 
-        yield return new WaitForSeconds(10f);
+        t = 0f;
+        while (t < phase2Duration)
+        {
+            float p = t / phase2Duration;
 
-        // PHASE 3 (phase2 → phase3): use the same escalation implementation as the season sequence.
+            ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
+            RenderSettings.fogDensity = Mathf.Lerp(0f, 0.01f, p);
+
+            t += Time.deltaTime;
+            yield return null;
+        }
+
+        ttfeController.SetSeason(1f);
+        ttfeController.SetWindSpeed(2.5f);
+        ttfeController.SetWindStrength(0.7f);
+
+        // PHASE 3 (30-45s): storm escalation.
         float totalElapsed = 0f;
         float nextLightningAt = float.MaxValue;
-
 
         if (phase3Skybox != null)
         {
             yield return StartCoroutine(SwapSkyboxWithFade(phase3Skybox, () => SetActiveLight(duskLight)));
+        }
+        else
+        {
+            SetActiveLight(duskLight);
         }
 
         SetRainGroupActive(true);
@@ -202,16 +252,6 @@ public class GardenController : MonoBehaviour
         PlayRainSystems();
 
         SetLightningGroupActive(true);
-
-        float rainDelayElapsed = 0f;
-        float clampedRainDelay = Mathf.Max(0f, phase3RainSoundDelay);
-        while (rainDelayElapsed < clampedRainDelay)
-        {
-            float dt = Time.deltaTime;
-            rainDelayElapsed += dt;
-            totalElapsed += dt;
-            yield return null;
-        }
 
         if (ambienceSource != null && rainClip != null)
         {
@@ -230,9 +270,9 @@ public class GardenController : MonoBehaviour
         nextLightningAt = totalElapsed + Mathf.Max(0f, phase3LightningDelayAfterRain);
 
         float phase3Elapsed = 0f;
-        while (phase3Elapsed < 60f)
+        while (phase3Elapsed < phase3Duration)
         {
-            float p = phase3Elapsed / 60f;
+            float p = phase3Elapsed / phase3Duration;
             ttfeController.SetSeason(Mathf.Lerp(1f, 2f, p));
             ttfeController.SetWindSpeed(Mathf.Lerp(2f, 3f, p));
             ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 1f, p));
@@ -259,20 +299,11 @@ public class GardenController : MonoBehaviour
         ttfeController.SetSeason(2f);
         ttfeController.SetWindSpeed(3f);
         ttfeController.SetWindStrength(1f);
-        RenderSettings.fogDensity = 0.1f;
+        RenderSettings.fogDensity = 0.03f;
 
         SetRainGroupActive(true);
         PlayRainSystems();
         SetRainEmissionRate(3000f);
-
-        if (lightningFlashCoroutine != null)
-        {
-            StopCoroutine(lightningFlashCoroutine);
-        }
-
-        lightningFlashCoroutine = StartCoroutine(FlashLightningIntermittently());
-
-        yield return new WaitForSeconds(10f);
 
         StopRainSystems();
         SetRainGroupActive(false);
@@ -296,13 +327,27 @@ public class GardenController : MonoBehaviour
             sfxSource.Stop();
         }
 
-        // RECOVERY (phase3 → phase1)
-        PlayRecoveryHapticIfConfigured();
+        // RECOVERY: swap back immediately, then settle quickly and remain recovered.
+        if (phase1Skybox != null)
+        {
+            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () =>
+            {
+                SetActiveLight(sunLight);
+                PlayRecoveryHapticIfConfigured();
+            }));
+        }
+        else
+        {
+            SetActiveLight(sunLight);
+            PlayRecoveryHapticIfConfigured();
+        }
+
+        const float recoveryTransitionDuration = 10f;
 
         t = 0f;
-        while (t < 20f)
+        while (t < recoveryTransitionDuration)
         {
-            float p = t / 20f;
+            float p = t / recoveryTransitionDuration;
 
             ttfeController.SetSeason(Mathf.Lerp(2f, -1f, p));
             ttfeController.SetWindSpeed(Mathf.Lerp(3f, 2f, p));
@@ -313,16 +358,17 @@ public class GardenController : MonoBehaviour
             yield return null;
         }
 
+        ttfeController.SetSeason(-1f);
+        ttfeController.SetWindSpeed(2f);
+        ttfeController.SetWindStrength(0.5f);
         RenderSettings.fogDensity = 0f;
 
-        if (phase1Skybox != null)
+        float recoveredHoldDuration = Mathf.Max(0f, recoveryDuration - recoveryTransitionDuration);
+        if (recoveredHoldDuration > 0f)
         {
-            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () => SetActiveLight(sunLight)));
+            yield return new WaitForSeconds(recoveredHoldDuration);
         }
-        else
-        {
-            SetActiveLight(sunLight);
-        }
+
          
         if (ambienceSource != null && jungleClip != null)
         {
@@ -666,13 +712,17 @@ public class GardenController : MonoBehaviour
 
     private void InitializeFadeCanvas()
     {
-        if (fadeCanvasGroup == null)
+        RefreshActiveFadeCanvasGroup();
+
+        if (activeFadeCanvasGroup == null)
         {
+            LogFadeDebug("InitializeFadeCanvas skipped because no fade canvas is available.");
             return;
         }
 
-        fadeCanvasGroup.alpha = 0f;
-        fadeCanvasGroup.gameObject.SetActive(false);
+        activeFadeCanvasGroup.alpha = 0f;
+        activeFadeCanvasGroup.gameObject.SetActive(false);
+        LogFadeDebug($"InitializeFadeCanvas on '{activeFadeCanvasGroup.gameObject.name}'.");
     }
 
     private IEnumerator SwapSkyboxWithFade(Material targetSkybox)
@@ -684,14 +734,20 @@ public class GardenController : MonoBehaviour
     {
         if (targetSkybox == null)
         {
+            LogFadeDebug("SwapSkyboxWithFade skipped because targetSkybox is null.");
             yield break;
         }
 
-        if (fadeCanvasGroup == null)
+        RefreshActiveFadeCanvasGroup();
+
+        if (activeFadeCanvasGroup == null)
         {
+            LogFadeDebug($"SwapSkyboxWithFade applying '{targetSkybox.name}' without fade because no fade canvas is available.");
             ApplySkybox(targetSkybox);
             yield break;
         }
+
+        LogFadeDebug($"SwapSkyboxWithFade starting for '{targetSkybox.name}' using canvas '{activeFadeCanvasGroup.gameObject.name}'.");
 
         if (skyboxFadeCoroutine != null)
         {
@@ -702,6 +758,7 @@ public class GardenController : MonoBehaviour
         yield return StartCoroutine(FadeCanvasAlpha(0f, 1f, skyboxFadeDuration));
         ApplySkybox(targetSkybox);
         onBlack?.Invoke();
+        LogFadeDebug($"Skybox swapped to '{targetSkybox.name}' while fade canvas is black.");
 
         if (skyboxFadeHoldDuration > 0f)
         {
@@ -710,6 +767,7 @@ public class GardenController : MonoBehaviour
 
         yield return StartCoroutine(FadeCanvasAlpha(1f, 0f, skyboxFadeDuration));
         skyboxFadeCoroutine = null;
+        LogFadeDebug($"SwapSkyboxWithFade completed for '{targetSkybox.name}'.");
     }
 
     private void SwapSkyboxWithFadeImmediate(Material targetSkybox)
@@ -719,7 +777,9 @@ public class GardenController : MonoBehaviour
             return;
         }
 
-        if (fadeCanvasGroup == null)
+        RefreshActiveFadeCanvasGroup();
+
+        if (activeFadeCanvasGroup == null)
         {
             ApplySkybox(targetSkybox);
             return;
@@ -735,13 +795,21 @@ public class GardenController : MonoBehaviour
 
     private IEnumerator FadeCanvasAlpha(float startAlpha, float endAlpha, float duration)
     {
-        if (fadeCanvasGroup == null)
+        RefreshActiveFadeCanvasGroup();
+
+        if (activeFadeCanvasGroup == null)
         {
+            LogFadeDebug("FadeCanvasAlpha skipped because no fade canvas is available.");
             yield break;
         }
 
-        fadeCanvasGroup.gameObject.SetActive(true);
-        fadeCanvasGroup.alpha = startAlpha;
+        UpdateRuntimeFadeCanvasPlacement();
+
+        activeFadeCanvasGroup.gameObject.SetActive(true);
+        activeFadeCanvasGroup.alpha = startAlpha;
+        LogFadeDebug(
+            $"FadeCanvasAlpha start on '{activeFadeCanvasGroup.gameObject.name}': start={startAlpha:0.00}, end={endAlpha:0.00}, " +
+            $"duration={duration:0.00}, active={activeFadeCanvasGroup.gameObject.activeSelf}, scale={activeFadeCanvasGroup.transform.lossyScale}.");
 
         float elapsed = 0f;
         float clampedDuration = Mathf.Max(0.01f, duration);
@@ -749,17 +817,125 @@ public class GardenController : MonoBehaviour
         while (elapsed < clampedDuration)
         {
             float t = elapsed / clampedDuration;
-            fadeCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t);
+            activeFadeCanvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t);
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        fadeCanvasGroup.alpha = endAlpha;
+        activeFadeCanvasGroup.alpha = endAlpha;
+        LogFadeDebug(
+            $"FadeCanvasAlpha end on '{activeFadeCanvasGroup.gameObject.name}': alpha={activeFadeCanvasGroup.alpha:0.00}, " +
+            $"active={activeFadeCanvasGroup.gameObject.activeSelf}, scale={activeFadeCanvasGroup.transform.lossyScale}.");
 
         if (Mathf.Approximately(endAlpha, 0f))
         {
-            fadeCanvasGroup.gameObject.SetActive(false);
+            activeFadeCanvasGroup.gameObject.SetActive(false);
+            LogFadeDebug($"Fade canvas '{activeFadeCanvasGroup.gameObject.name}' deactivated after fade-out.");
         }
+    }
+
+    private void LogFadeDebug(string message)
+    {
+        if (!enableFadeDebugLogging)
+        {
+            return;
+        }
+
+        Debug.Log($"GardenController FadeDebug: {message}");
+    }
+
+    private void RefreshActiveFadeCanvasGroup()
+    {
+        if (preferRuntimeCameraFadeOverlay && EnsureRuntimeFadeCanvas())
+        {
+            activeFadeCanvasGroup = runtimeFadeCanvasGroup;
+            return;
+        }
+
+        activeFadeCanvasGroup = fadeCanvasGroup;
+    }
+
+    private bool EnsureRuntimeFadeCanvas()
+    {
+        if (runtimeFadeCanvasGroup != null)
+        {
+            UpdateRuntimeFadeCanvasPlacement();
+            return true;
+        }
+
+        Camera targetCamera = Camera.main;
+        if (targetCamera == null)
+        {
+            LogFadeDebug("EnsureRuntimeFadeCanvas skipped because Camera.main is null.");
+            return false;
+        }
+
+        int uiLayer = LayerMask.NameToLayer("UI");
+        if (uiLayer < 0)
+        {
+            uiLayer = 0;
+        }
+
+        GameObject canvasObject = new GameObject("RuntimeFadeCanvas");
+        canvasObject.layer = uiLayer;
+        canvasObject.transform.SetParent(targetCamera.transform, false);
+
+        runtimeFadeCanvas = canvasObject.AddComponent<Canvas>();
+        runtimeFadeCanvas.renderMode = RenderMode.WorldSpace;
+        runtimeFadeCanvas.worldCamera = targetCamera;
+        runtimeFadeCanvas.sortingOrder = short.MaxValue;
+
+        canvasObject.AddComponent<GraphicRaycaster>();
+        runtimeFadeCanvasGroup = canvasObject.AddComponent<CanvasGroup>();
+        runtimeFadeCanvasRect = canvasObject.GetComponent<RectTransform>();
+        runtimeFadeCanvasRect.anchorMin = new Vector2(0.5f, 0.5f);
+        runtimeFadeCanvasRect.anchorMax = new Vector2(0.5f, 0.5f);
+        runtimeFadeCanvasRect.pivot = new Vector2(0.5f, 0.5f);
+
+        GameObject imageObject = new GameObject("RuntimeFadeOverlay");
+        imageObject.layer = uiLayer;
+        imageObject.transform.SetParent(canvasObject.transform, false);
+
+        RectTransform imageRect = imageObject.AddComponent<RectTransform>();
+        imageRect.anchorMin = Vector2.zero;
+        imageRect.anchorMax = Vector2.one;
+        imageRect.offsetMin = Vector2.zero;
+        imageRect.offsetMax = Vector2.zero;
+
+        Image image = imageObject.AddComponent<Image>();
+        image.color = Color.black;
+        image.raycastTarget = false;
+
+        UpdateRuntimeFadeCanvasPlacement();
+        runtimeFadeCanvasGroup.alpha = 0f;
+        runtimeFadeCanvasGroup.gameObject.SetActive(false);
+
+        LogFadeDebug($"Created runtime fade canvas on camera '{targetCamera.name}'.");
+        return true;
+    }
+
+    private void UpdateRuntimeFadeCanvasPlacement()
+    {
+        if (runtimeFadeCanvasRect == null || runtimeFadeCanvas == null)
+        {
+            return;
+        }
+
+        Camera targetCamera = runtimeFadeCanvas.worldCamera != null ? runtimeFadeCanvas.worldCamera : Camera.main;
+        if (targetCamera == null)
+        {
+            return;
+        }
+
+        float distance = Mathf.Max(0.05f, runtimeFadeOverlayDistance);
+        float margin = Mathf.Max(1.05f, runtimeFadeOverlayMargin);
+        float height = 2f * Mathf.Tan(targetCamera.fieldOfView * 0.5f * Mathf.Deg2Rad) * distance * margin;
+        float width = height * targetCamera.aspect;
+
+        runtimeFadeCanvasRect.localPosition = new Vector3(0f, 0f, distance);
+        runtimeFadeCanvasRect.localRotation = Quaternion.identity;
+        runtimeFadeCanvasRect.localScale = Vector3.one * 0.001f;
+        runtimeFadeCanvasRect.sizeDelta = new Vector2(width * 1000f, height * 1000f);
     }
 
     private void ApplySkybox(Material targetSkybox)
@@ -781,7 +957,7 @@ public class GardenController : MonoBehaviour
             return;
         }
 
-        hapticsController.PlayHaptic(recoveryHapticEventName);
+        hapticsController.LoopHaptic(recoveryHapticEventName);
     }
 
     private void CachePrimaryRainSystem()

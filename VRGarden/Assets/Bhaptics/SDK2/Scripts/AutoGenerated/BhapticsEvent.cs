@@ -17,6 +17,8 @@ namespace Bhaptics.SDK2
     public class BhapticsEvent
     {
         
-        public const string VRGARDENHAPTIC = "vrgardenhaptic";
+        public const string HAPPY = "happy";
+        
+        public const string SAD = "sad";
     }
 }

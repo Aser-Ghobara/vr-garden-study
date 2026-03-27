@@ -45,6 +45,7 @@ public class ExperimentFlow : MonoBehaviour
 
     private Coroutine startVideoRoutine;
     private Coroutine delayedHapticRoutine;
+    private Coroutine endUIRoutine;
 
     private void Start()
     {
@@ -58,10 +59,13 @@ public class ExperimentFlow : MonoBehaviour
             reflectionGroup.SetActive(false);
         }
 
+        HideEndUI();
     }
 
     public void StartVideo()
     {
+        HideEndUI();
+
         if (startVideoRoutine != null)
         {
             StopCoroutine(startVideoRoutine);
@@ -72,6 +76,8 @@ public class ExperimentFlow : MonoBehaviour
 
     public void StartGarden()
     {
+        HideEndUI();
+
         if (reflectionGroup != null)
         {
             reflectionGroup.SetActive(false);
@@ -88,7 +94,7 @@ public class ExperimentFlow : MonoBehaviour
             return;
         }
 
-        gardenController.StartResponsiveSequence();
+        StartEndUIRoutine(ShowEndUIAfterResponsiveSequence());
     }
 
     private IEnumerator StartVideoRoutine()
@@ -171,6 +177,8 @@ public class ExperimentFlow : MonoBehaviour
             Debug.LogWarning("ExperimentFlow: Trial is null.");
             yield break;
         }
+
+        HideEndUI();
 
         if (startVideoRoutine != null)
         {
@@ -267,11 +275,14 @@ public class ExperimentFlow : MonoBehaviour
             }
 
             Debug.Log("Non-responsive trial: garden stays neutral.");
+            StartEndUIRoutine(ShowEndUIAfterDelay(60f));
             yield break;
         }
 
         Debug.Log("Responsive trial: running garden sequence.");
         gardenController.StartResponsiveSequence();
+        yield return new WaitUntil(() => gardenController == null || !gardenController.IsSequenceRunning);
+        ShowEndUI();
     }
 
     private void StartNonResponsiveDelayedHaptic()
@@ -302,7 +313,7 @@ public class ExperimentFlow : MonoBehaviour
             yield break;
         }
 
-        hapticsController.PlayHaptic(nonResponsiveGardenHapticEventName);
+        hapticsController.LoopHaptic(nonResponsiveGardenHapticEventName);
         delayedHapticRoutine = null;
     }
 
@@ -322,6 +333,76 @@ public class ExperimentFlow : MonoBehaviour
         if (externalHapticsController != null)
         {
             externalHapticsController.StopHaptics();
+        }
+    }
+
+    private void StartEndUIRoutine(IEnumerator routine)
+    {
+        Debug.LogWarning("ExperimentFlow: StartEndUIRoutine called.");
+        if (endUIRoutine != null)
+        {
+            Debug.LogWarning("ExperimentFlow: Cancelling existing end UI routine before starting a new one.");
+            StopCoroutine(endUIRoutine);
+        }
+
+        endUIRoutine = StartCoroutine(RunEndUIRoutine(routine));
+    }
+
+    private IEnumerator RunEndUIRoutine(IEnumerator routine)
+    {
+        Debug.LogWarning("ExperimentFlow: RunEndUIRoutine started.");
+        yield return StartCoroutine(routine);
+        Debug.LogWarning("ExperimentFlow: RunEndUIRoutine completed.");
+        endUIRoutine = null;
+    }
+
+    private IEnumerator ShowEndUIAfterResponsiveSequence()
+    {
+        gardenController.StartResponsiveSequence();
+        yield return new WaitUntil(() => gardenController == null || !gardenController.IsSequenceRunning);
+        ShowEndUI();
+    }
+
+    private IEnumerator ShowEndUIAfterDelay(float delaySeconds)
+    {
+        Debug.LogWarning($"ExperimentFlow: Waiting {delaySeconds:0.##} seconds before showing EndUI.");
+        yield return new WaitForSeconds(delaySeconds);
+        Debug.LogWarning("ExperimentFlow: Delay complete. Showing EndUI now.");
+        ShowEndUI();
+    }
+
+    private void ShowEndUI()
+    {
+        Debug.LogWarning("ExperimentFlow: ShowEndUI called.");
+        StopAllHaptics();
+
+        if (videoPhaseController != null)
+        {
+            videoPhaseController.ShowEndUI();
+        }
+        else
+        {
+            Debug.LogWarning("ExperimentFlow: videoPhaseController is null, cannot show EndUI.");
+        }
+    }
+
+    private void HideEndUI()
+    {
+        if (endUIRoutine != null)
+        {
+            Debug.LogWarning("ExperimentFlow: HideEndUI cancelled the pending end UI routine.");
+            StopCoroutine(endUIRoutine);
+            endUIRoutine = null;
+        }
+
+        Debug.LogWarning("ExperimentFlow: HideEndUI called.");
+        if (videoPhaseController != null)
+        {
+            videoPhaseController.HideEndUI();
+        }
+        else
+        {
+            Debug.LogWarning("ExperimentFlow: videoPhaseController is null, cannot hide EndUI.");
         }
     }
 }

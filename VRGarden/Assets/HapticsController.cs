@@ -50,6 +50,35 @@ public class HapticsController : MonoBehaviour
     }
 
     /// <summary>
+    /// Plays the default event in a repeating loop until stopped.
+    /// </summary>
+    public void LoopDefaultHaptic()
+    {
+        if (string.IsNullOrWhiteSpace(defaultEventName))
+        {
+            Debug.LogWarning("[HapticsController] Default event name is empty.");
+            return;
+        }
+
+        LoopHaptic(defaultEventName);
+    }
+
+    /// <summary>
+    /// Plays the given bHaptics event in a repeating loop until stopped.
+    /// </summary>
+    public void LoopHaptic(string eventName)
+    {
+        if (string.IsNullOrWhiteSpace(eventName))
+        {
+            Debug.LogWarning("[HapticsController] Event name is empty.");
+            return;
+        }
+
+        lastRequestId = BhapticsLibrary.PlayLoop(eventName, intensity, duration, angleX, offsetY);
+        Debug.Log($"[HapticsController] Looping haptic event '{eventName}' with request id {lastRequestId}.");
+    }
+
+    /// <summary>
     /// Stops the last request started by this controller, if any.
     /// </summary>
     public void StopLastHaptic()

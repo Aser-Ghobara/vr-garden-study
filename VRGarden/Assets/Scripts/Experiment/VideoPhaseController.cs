@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Video;
 
@@ -7,6 +8,7 @@ public class VideoPhaseController : MonoBehaviour
     public VideoPlayer videoPlayer;
     public GameObject videoGroup;
     public GameObject reflectionGroup;
+    public GameObject endUIGroup;
     public GardenController gardenController;
 
     [Header("Head-Locked Video")]
@@ -23,11 +25,19 @@ public class VideoPhaseController : MonoBehaviour
     public float reflectionHorizontalOffset = 0f;
     public Vector3 reflectionRotationOffsetEuler;
 
+    [Header("Head-Locked End UI")]
+    public Transform endUIFollowTarget;
+    public float endUIDistanceFromCamera = 1.5f;
+    public float endUIVerticalOffset = 0f;
+    public float endUIHorizontalOffset = 0f;
+    public Vector3 endUIRotationOffsetEuler;
+
     private void LateUpdate()
     {
         if (videoGroup == null || !videoGroup.activeInHierarchy || videoPlayer == null)
         {
             UpdateReflectionGroupHeadLock();
+            UpdateEndUIHeadLock();
             return;
         }
 
@@ -35,6 +45,7 @@ public class VideoPhaseController : MonoBehaviour
         if (cameraTransform == null)
         {
             UpdateReflectionGroupHeadLock();
+            UpdateEndUIHeadLock();
             return;
         }
 
@@ -51,10 +62,13 @@ public class VideoPhaseController : MonoBehaviour
             Quaternion.Euler(rotationOffsetEuler);
 
         UpdateReflectionGroupHeadLock();
+        UpdateEndUIHeadLock();
     }
 
     public void StartVideoPhase()
     {
+        HideEndUI();
+
         if (gardenController != null && gardenController.ambienceSource != null)
         {
             gardenController.ambienceSource.Stop();
@@ -134,55 +148,119 @@ public class VideoPhaseController : MonoBehaviour
         return null;
     }
 
+    public void ShowEndUI()
+    {
+        if (endUIGroup != null)
+        {
+            endUIGroup.SetActive(true);
+        }
+    }
+
+    public void HideEndUI()
+    {
+        if (endUIGroup != null)
+        {
+            endUIGroup.SetActive(false);
+        }
+    }
+
     private void UpdateReflectionGroupHeadLock()
     {
-        if (reflectionGroup == null || !reflectionGroup.activeInHierarchy)
+        UpdateHeadLockedGroup(
+            reflectionGroup,
+            GetReflectionFollowTarget(),
+            reflectionDistanceFromCamera,
+            reflectionVerticalOffset,
+            reflectionHorizontalOffset,
+            reflectionRotationOffsetEuler);
+    }
+
+    private void UpdateEndUIHeadLock()
+    {
+        UpdateHeadLockedGroup(
+            endUIGroup,
+            GetEndUIFollowTarget(),
+            endUIDistanceFromCamera,
+            endUIVerticalOffset,
+            endUIHorizontalOffset,
+            endUIRotationOffsetEuler);
+    }
+
+    private void UpdateHeadLockedGroup(
+        GameObject group,
+        Transform followTarget,
+        float distanceFromTarget,
+        float verticalOffsetAmount,
+        float horizontalOffsetAmount,
+        Vector3 rotationOffset)
+    {
+        if (group == null || !group.activeInHierarchy)
         {
             return;
         }
 
         Transform cameraTransform = GetTargetCamera();
-        if (cameraTransform == null)
-        {
-            return;
-        }
-
-        Transform reflectionTransform = GetReflectionFollowTarget();
-        if (reflectionTransform == null)
+        if (cameraTransform == null || followTarget == null)
         {
             return;
         }
 
         Vector3 desiredPosition =
             cameraTransform.position +
-            cameraTransform.forward * reflectionDistanceFromCamera +
-            cameraTransform.up * reflectionVerticalOffset +
-            cameraTransform.right * reflectionHorizontalOffset;
+            cameraTransform.forward * distanceFromTarget +
+            cameraTransform.up * verticalOffsetAmount +
+            cameraTransform.right * horizontalOffsetAmount;
 
-        reflectionTransform.position = desiredPosition;
-        reflectionTransform.rotation =
+        followTarget.position = desiredPosition;
+        followTarget.rotation =
             Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
-            Quaternion.Euler(reflectionRotationOffsetEuler);
+            Quaternion.Euler(rotationOffset);
     }
 
     private Transform GetReflectionFollowTarget()
     {
-        if (reflectionFollowTarget != null)
+        return GetFollowTarget(reflectionGroup, reflectionFollowTarget);
+    }
+
+    private Transform GetEndUIFollowTarget()
+    {
+        if (endUIFollowTarget != null)
         {
-            return reflectionFollowTarget;
+            return endUIFollowTarget;
         }
 
-        if (reflectionGroup == null)
+        if (endUIGroup == null)
         {
             return null;
         }
 
-        Canvas reflectionCanvas = reflectionGroup.GetComponentInChildren<Canvas>(true);
-        if (reflectionCanvas != null)
+        return endUIGroup.transform;
+    }
+
+    private Transform GetFollowTarget(GameObject group, Transform explicitTarget)
+    {
+        if (explicitTarget != null)
         {
-            return reflectionCanvas.transform;
+            return explicitTarget;
         }
 
-        return reflectionGroup.transform;
+        if (group == null)
+        {
+            return null;
+        }
+
+        TMP_Text groupText = group.GetComponentInChildren<TMP_Text>(true);
+        if (groupText != null)
+        {
+            return groupText.transform;
+        }
+
+        Canvas groupCanvas = group.GetComponentInChildren<Canvas>(true);
+        if (groupCanvas != null)
+        {
+            return groupCanvas.transform;
+        }
+
+        return group.transform;
     }
 }
