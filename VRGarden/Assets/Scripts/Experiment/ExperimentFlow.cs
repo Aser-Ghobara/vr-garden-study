@@ -1,4 +1,6 @@
 using System.Collections;
+using System.IO;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
@@ -42,6 +44,12 @@ public class ExperimentFlow : MonoBehaviour
 
     [Tooltip("Plays 5 seconds after arriving in the garden for non-responsive + haptic trials.")]
     public string nonResponsiveGardenHapticEventName;
+
+    [Header("Reflection Recording")]
+    [Tooltip("Participant identifier included in saved reflection recording filenames.")]
+    public string participantId = "participant";
+    [Tooltip("Folder name inside Application.persistentDataPath where reflection recordings are saved.")]
+    public string reflectionRecordingFolderName = "ReflectionRecordings";
 
     private Coroutine startVideoRoutine;
     private Coroutine delayedHapticRoutine;
@@ -150,21 +158,7 @@ public class ExperimentFlow : MonoBehaviour
             reflectionGroup.SetActive(true);
         }
 
-        if (Microphone.devices != null && Microphone.devices.Length > 0)
-        {
-            Microphone.Start(null, false, 20, 44100);
-            yield return new WaitForSeconds(20f);
-
-            if (Microphone.IsRecording(null))
-            {
-                Microphone.End(null);
-            }
-        }
-        else
-        {
-            Debug.LogWarning("ExperimentFlow: No microphone device found. Reflection recording skipped.");
-            yield return new WaitForSeconds(20f);
-        }
+        yield return StartCoroutine(RecordAndSaveReflectionAudio("manual"));
 
         if (startGardenButton != null)
         {
@@ -208,21 +202,7 @@ public class ExperimentFlow : MonoBehaviour
         yield return new WaitUntil(() => reflectionGroup != null && reflectionGroup.activeSelf);
 
         Debug.Log("ExperimentFlow: Starting 20-second reflection recording.");
-        if (Microphone.devices != null && Microphone.devices.Length > 0)
-        {
-            Microphone.Start(null, false, 20, 44100);
-            yield return new WaitForSeconds(20f);
-
-            if (Microphone.IsRecording(null))
-            {
-                Microphone.End(null);
-            }
-        }
-        else
-        {
-            Debug.LogWarning("ExperimentFlow: No microphone device found. Reflection recording skipped.");
-            yield return new WaitForSeconds(20f);
-        }
+        yield return StartCoroutine(RecordAndSaveReflectionAudio($"trial_{trial.trialIndex}"));
 
         Debug.Log("ExperimentFlow: Reflection phase complete.");
 
@@ -353,6 +333,142 @@ public class ExperimentFlow : MonoBehaviour
         gardenController.ambienceSource.loop = true;
         gardenController.ambienceSource.volume = 0.05f;
         gardenController.ambienceSource.Play();
+    }
+
+    private IEnumerator RecordAndSaveReflectionAudio(string recordingLabel)
+    {
+        const int recordingLengthSeconds = 20;
+        const int sampleRate = 44100;
+        const string microphoneDeviceName = null;
+
+        if (Microphone.devices == null || Microphone.devices.Length == 0)
+        {
+            Debug.LogWarning("ExperimentFlow: No microphone device found. Reflection recording skipped.");
+            yield return new WaitForSeconds(recordingLengthSeconds);
+            yield break;
+        }
+
+        AudioClip recordedClip = Microphone.Start(microphoneDeviceName, false, recordingLengthSeconds, sampleRate);
+        if (recordedClip == null)
+        {
+            Debug.LogWarning("ExperimentFlow: Microphone.Start returned null. Reflection recording skipped.");
+            yield return new WaitForSeconds(recordingLengthSeconds);
+            yield break;
+        }
+
+        yield return new WaitForSeconds(recordingLengthSeconds);
+
+        int recordedSamples = Microphone.GetPosition(microphoneDeviceName);
+        if (recordedSamples <= 0)
+        {
+            recordedSamples = recordedClip.samples;
+        }
+
+        if (Microphone.IsRecording(microphoneDeviceName))
+        {
+            Microphone.End(microphoneDeviceName);
+        }
+
+        if (recordedSamples <= 0)
+        {
+            Debug.LogWarning("ExperimentFlow: Reflection recording captured no samples.");
+            yield break;
+        }
+
+        SaveReflectionClip(recordedClip, recordedSamples, recordingLabel);
+    }
+
+    private void SaveReflectionClip(AudioClip sourceClip, int recordedSamples, string recordingLabel)
+    {
+        if (sourceClip == null)
+        {
+            return;
+        }
+
+        int clampedSamples = Mathf.Clamp(recordedSamples, 1, sourceClip.samples);
+        int totalSampleCount = clampedSamples * sourceClip.channels;
+        float[] sampleBuffer = new float[totalSampleCount];
+        sourceClip.GetData(sampleBuffer, 0);
+
+        string safeParticipantId = SanitizeFileNameSegment(
+            string.IsNullOrWhiteSpace(participantId) ? "participant" : participantId);
+        string safeLabel = SanitizeFileNameSegment(
+            string.IsNullOrWhiteSpace(recordingLabel) ? "reflection" : recordingLabel);
+        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string directoryPath = Path.Combine(Application.persistentDataPath, reflectionRecordingFolderName);
+        Directory.CreateDirectory(directoryPath);
+
+        string filePath = Path.Combine(directoryPath, $"{safeParticipantId}_{safeLabel}_{timestamp}.wav");
+        WriteWavFile(filePath, sampleBuffer, sourceClip.channels, sourceClip.frequency);
+        Debug.Log($"ExperimentFlow: Saved reflection recording to {filePath}");
+    }
+
+    private void WriteWavFile(string filePath, float[] samples, int channelCount, int sampleRate)
+    {
+        using (FileStream fileStream = new FileStream(filePath, FileMode.Create))
+        using (BinaryWriter writer = new BinaryWriter(fileStream))
+        {
+            int bytesPerSample = 2;
+            int byteRate = sampleRate * channelCount * bytesPerSample;
+            int dataLength = samples.Length * bytesPerSample;
+
+            writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+            writer.Write(36 + dataLength);
+            writer.Write(Encoding.ASCII.GetBytes("WAVE"));
+            writer.Write(Encoding.ASCII.GetBytes("fmt "));
+            writer.Write(16);
+            writer.Write((short)1);
+            writer.Write((short)channelCount);
+            writer.Write(sampleRate);
+            writer.Write(byteRate);
+            writer.Write((short)(channelCount * bytesPerSample));
+            writer.Write((short)(bytesPerSample * 8));
+            writer.Write(Encoding.ASCII.GetBytes("data"));
+            writer.Write(dataLength);
+
+            for (int i = 0; i < samples.Length; i++)
+            {
+                short pcmSample = (short)Mathf.Clamp(samples[i] * short.MaxValue, short.MinValue, short.MaxValue);
+                writer.Write(pcmSample);
+            }
+        }
+    }
+
+    private string SanitizeFileNameSegment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "unknown";
+        }
+
+        StringBuilder builder = new StringBuilder(value.Length);
+        char[] invalidCharacters = Path.GetInvalidFileNameChars();
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            char currentCharacter = value[i];
+            bool isInvalid = false;
+
+            for (int j = 0; j < invalidCharacters.Length; j++)
+            {
+                if (currentCharacter == invalidCharacters[j])
+                {
+                    isInvalid = true;
+                    break;
+                }
+            }
+
+            if (isInvalid || char.IsWhiteSpace(currentCharacter))
+            {
+                builder.Append('_');
+            }
+            else
+            {
+                builder.Append(currentCharacter);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private void StartEndUIRoutine(IEnumerator routine)

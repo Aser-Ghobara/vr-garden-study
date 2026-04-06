@@ -8,6 +8,7 @@ public class VideoPhaseController : MonoBehaviour
     public VideoPlayer videoPlayer;
     public GameObject videoGroup;
     public GameObject reflectionGroup;
+    public GameObject postRecoveryGroup;
     public GameObject endUIGroup;
     public GardenController gardenController;
 
@@ -32,11 +33,19 @@ public class VideoPhaseController : MonoBehaviour
     public float endUIHorizontalOffset = 0f;
     public Vector3 endUIRotationOffsetEuler;
 
+    [Header("Head-Locked Post-Recovery UI")]
+    public Transform postRecoveryFollowTarget;
+    public float postRecoveryDistanceFromCamera = 1.5f;
+    public float postRecoveryVerticalOffset = 0f;
+    public float postRecoveryHorizontalOffset = 0f;
+    public Vector3 postRecoveryRotationOffsetEuler;
+
     private void LateUpdate()
     {
         if (videoGroup == null || !videoGroup.activeInHierarchy || videoPlayer == null)
         {
             UpdateReflectionGroupHeadLock();
+            UpdatePostRecoveryGroupHeadLock();
             UpdateEndUIHeadLock();
             return;
         }
@@ -45,6 +54,7 @@ public class VideoPhaseController : MonoBehaviour
         if (cameraTransform == null)
         {
             UpdateReflectionGroupHeadLock();
+            UpdatePostRecoveryGroupHeadLock();
             UpdateEndUIHeadLock();
             return;
         }
@@ -62,6 +72,7 @@ public class VideoPhaseController : MonoBehaviour
             Quaternion.Euler(rotationOffsetEuler);
 
         UpdateReflectionGroupHeadLock();
+        UpdatePostRecoveryGroupHeadLock();
         UpdateEndUIHeadLock();
     }
 
@@ -150,6 +161,12 @@ public class VideoPhaseController : MonoBehaviour
 
     public void ShowEndUI()
     {
+        if (postRecoveryGroup != null)
+        {
+            postRecoveryGroup.SetActive(true);
+            return;
+        }
+
         if (endUIGroup != null)
         {
             endUIGroup.SetActive(true);
@@ -158,6 +175,11 @@ public class VideoPhaseController : MonoBehaviour
 
     public void HideEndUI()
     {
+        if (postRecoveryGroup != null)
+        {
+            postRecoveryGroup.SetActive(false);
+        }
+
         if (endUIGroup != null)
         {
             endUIGroup.SetActive(false);
@@ -184,6 +206,17 @@ public class VideoPhaseController : MonoBehaviour
             endUIVerticalOffset,
             endUIHorizontalOffset,
             endUIRotationOffsetEuler);
+    }
+
+    private void UpdatePostRecoveryGroupHeadLock()
+    {
+        UpdateHeadLockedGroup(
+            postRecoveryGroup,
+            GetPostRecoveryFollowTarget(),
+            postRecoveryDistanceFromCamera,
+            postRecoveryVerticalOffset,
+            postRecoveryHorizontalOffset,
+            postRecoveryRotationOffsetEuler);
     }
 
     private void UpdateHeadLockedGroup(
@@ -235,6 +268,11 @@ public class VideoPhaseController : MonoBehaviour
         }
 
         return endUIGroup.transform;
+    }
+
+    private Transform GetPostRecoveryFollowTarget()
+    {
+        return GetFollowTarget(postRecoveryGroup, postRecoveryFollowTarget);
     }
 
     private Transform GetFollowTarget(GameObject group, Transform explicitTarget)

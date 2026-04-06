@@ -51,6 +51,7 @@ public class GardenController : MonoBehaviour
 
     [Header("Recovery Wildlife")]
     public GameObject recoveryBirdFlock;
+    public GameObject recoveryButterflyPrefab;
 
     private ParticleSystem rainSystem;
     private ParticleSystem.EmissionModule rainEmission;
@@ -75,6 +76,7 @@ public class GardenController : MonoBehaviour
 
         SetLightningGroupActive(false);
         SetRecoveryBirdFlockActive(false);
+        SetRecoveryButterflyActive(false);
         InitializeFadeCanvas();
 
         // Ensure controlled audio startup behavior.
@@ -154,6 +156,16 @@ public class GardenController : MonoBehaviour
         SetRecoveryBirdFlockActive(false);
     }
 
+    public void StartRecoveryButterfly()
+    {
+        SetRecoveryButterflyActive(true);
+    }
+
+    public void StopRecoveryButterfly()
+    {
+        SetRecoveryButterflyActive(false);
+    }
+
     private void StartManagedGardenSequence(IEnumerator sequence)
     {
         StopActiveGardenSequence();
@@ -217,6 +229,7 @@ public class GardenController : MonoBehaviour
         SetLightningGroupActive(false);
         StopLightningSystems();
         SetRecoveryBirdFlockActive(false);
+        SetRecoveryButterflyActive(false);
 
         ttfeController.SetSeason(0f);
         ttfeController.SetWindSpeed(2f);
@@ -361,11 +374,14 @@ public class GardenController : MonoBehaviour
                 SetActiveLight(recoveryStartLight);
                 PlayRecoveryHapticIfConfigured();
             }));
+
+            StartRecoveryButterfly();
         }
         else
         {
             SetActiveLight(recoveryStartLight);
             PlayRecoveryHapticIfConfigured();
+            StartRecoveryButterfly();
         }
 
         const float recoveryTransitionDuration = 10f;
@@ -453,6 +469,7 @@ public class GardenController : MonoBehaviour
         StopLightningSystems();
         SetLightningGroupActive(false);
         SetRecoveryBirdFlockActive(false);
+        SetRecoveryButterflyActive(false);
 
         if (ttfeController != null)
         {
@@ -1099,6 +1116,14 @@ public class GardenController : MonoBehaviour
         if (recoveryBirdFlock != null && recoveryBirdFlock.activeSelf != isActive)
         {
             recoveryBirdFlock.SetActive(isActive);
+        }
+    }
+
+    private void SetRecoveryButterflyActive(bool isActive)
+    {
+        if (recoveryButterflyPrefab != null && recoveryButterflyPrefab.activeSelf != isActive)
+        {
+            recoveryButterflyPrefab.SetActive(isActive);
         }
     }
 
