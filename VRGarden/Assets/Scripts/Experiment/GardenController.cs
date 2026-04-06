@@ -49,6 +49,9 @@ public class GardenController : MonoBehaviour
     [Header("Haptics")]
     public HapticsController hapticsController;
 
+    [Header("Recovery Wildlife")]
+    public GameObject recoveryBirdFlock;
+
     private ParticleSystem rainSystem;
     private ParticleSystem.EmissionModule rainEmission;
     private Coroutine activeGardenSequence;
@@ -59,6 +62,7 @@ public class GardenController : MonoBehaviour
     private Canvas runtimeFadeCanvas;
     private RectTransform runtimeFadeCanvasRect;
     private string recoveryHapticEventName;
+    private bool useMidDayLightForRecoveryStart;
     private const float RainLoopDuration = 20f;
 
     public bool IsSequenceRunning => activeGardenSequence != null;
@@ -70,6 +74,7 @@ public class GardenController : MonoBehaviour
         SetRainGroupActive(false);
 
         SetLightningGroupActive(false);
+        SetRecoveryBirdFlockActive(false);
         InitializeFadeCanvas();
 
         // Ensure controlled audio startup behavior.
@@ -134,6 +139,21 @@ public class GardenController : MonoBehaviour
         recoveryHapticEventName = eventName;
     }
 
+    public void ConfigureRecoveryLighting(bool useMidDayLight)
+    {
+        useMidDayLightForRecoveryStart = useMidDayLight;
+    }
+
+    public void StartRecoveryBirdFlock()
+    {
+        SetRecoveryBirdFlockActive(true);
+    }
+
+    public void StopRecoveryBirdFlock()
+    {
+        SetRecoveryBirdFlockActive(false);
+    }
+
     private void StartManagedGardenSequence(IEnumerator sequence)
     {
         StopActiveGardenSequence();
@@ -196,6 +216,7 @@ public class GardenController : MonoBehaviour
         StopRainSystems();
         SetLightningGroupActive(false);
         StopLightningSystems();
+        SetRecoveryBirdFlockActive(false);
 
         ttfeController.SetSeason(0f);
         ttfeController.SetWindSpeed(2f);
@@ -328,17 +349,22 @@ public class GardenController : MonoBehaviour
         }
 
         // RECOVERY: swap back immediately, then settle quickly and remain recovered.
+        Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
+            ? midDayLight
+            : sunLight;
+        StartRecoveryBirdFlock();
+
         if (phase1Skybox != null)
         {
             yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () =>
             {
-                SetActiveLight(sunLight);
+                SetActiveLight(recoveryStartLight);
                 PlayRecoveryHapticIfConfigured();
             }));
         }
         else
         {
-            SetActiveLight(sunLight);
+            SetActiveLight(recoveryStartLight);
             PlayRecoveryHapticIfConfigured();
         }
 
@@ -380,6 +406,7 @@ public class GardenController : MonoBehaviour
         }
 
         recoveryHapticEventName = null;
+        useMidDayLightForRecoveryStart = false;
     }
 
     private void SetActiveLight(Light activeLight)
@@ -413,10 +440,11 @@ public class GardenController : MonoBehaviour
     {
         StopActiveGardenSequence();
         recoveryHapticEventName = null;
+        useMidDayLightForRecoveryStart = false;
 
         if (neutralSkybox != null)
         {
-            SwapSkyboxWithFadeImmediate(neutralSkybox);
+            ApplySkybox(neutralSkybox);
         }
 
         StopRainSystems();
@@ -424,6 +452,7 @@ public class GardenController : MonoBehaviour
 
         StopLightningSystems();
         SetLightningGroupActive(false);
+        SetRecoveryBirdFlockActive(false);
 
         if (ttfeController != null)
         {
@@ -508,6 +537,7 @@ public class GardenController : MonoBehaviour
         SetRainGroupActive(false);
 
         SetLightningGroupActive(false);
+        SetRecoveryBirdFlockActive(false);
 
         ttfeController.SetSeason(-1f);
         ttfeController.SetWindSpeed(1f);
@@ -551,6 +581,7 @@ public class GardenController : MonoBehaviour
         SetRainGroupActive(false);
 
         SetLightningGroupActive(false);
+        SetRecoveryBirdFlockActive(false);
 
         float phase2Elapsed = 0f;
         while (phase2Elapsed < 30f)
@@ -591,6 +622,7 @@ public class GardenController : MonoBehaviour
         PlayRainSystems();
 
         SetLightningGroupActive(true);
+        SetRecoveryBirdFlockActive(false);
 
         // 2) Wait a bit before starting rain ambience.
         float rainDelayElapsed = 0f;
@@ -1059,6 +1091,14 @@ public class GardenController : MonoBehaviour
         if (lightningGroup != null && lightningGroup.activeSelf != isActive)
         {
             lightningGroup.SetActive(isActive);
+        }
+    }
+
+    private void SetRecoveryBirdFlockActive(bool isActive)
+    {
+        if (recoveryBirdFlock != null && recoveryBirdFlock.activeSelf != isActive)
+        {
+            recoveryBirdFlock.SetActive(isActive);
         }
     }
 

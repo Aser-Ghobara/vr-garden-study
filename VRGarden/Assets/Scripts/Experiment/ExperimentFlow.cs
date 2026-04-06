@@ -49,6 +49,11 @@ public class ExperimentFlow : MonoBehaviour
 
     private void Start()
     {
+        if (gardenGroup != null)
+        {
+            gardenGroup.SetActive(true);
+        }
+
         if (videoGroup != null)
         {
             videoGroup.SetActive(false);
@@ -226,19 +231,12 @@ public class ExperimentFlow : MonoBehaviour
             reflectionGroup.SetActive(false);
         }
 
-        if (transitionController != null)
+        if (gardenGroup != null)
         {
-            Debug.Log("ExperimentFlow: Starting trial transition.");
-            yield return StartCoroutine(transitionController.DoTransition());
+            gardenGroup.SetActive(true);
         }
-        else
-        {
-            Debug.LogWarning("ExperimentFlow: TransitionController is not assigned. Activating garden group directly.");
-            if (gardenGroup != null)
-            {
-                gardenGroup.SetActive(true);
-            }
-        }
+
+        RestoreGardenAmbience();
 
         if (gardenController == null)
         {
@@ -265,6 +263,11 @@ public class ExperimentFlow : MonoBehaviour
             {
                 gardenController.ConfigureRecoveryHaptics(null);
             }
+        }
+
+        if (gardenController != null)
+        {
+            gardenController.ConfigureRecoveryLighting(trial.trialIndex == 0);
         }
 
         if (trial.responsiveness == TrialManager.ResponsivenessType.NonResponsive)
@@ -334,6 +337,22 @@ public class ExperimentFlow : MonoBehaviour
         {
             externalHapticsController.StopHaptics();
         }
+    }
+
+    private void RestoreGardenAmbience()
+    {
+        if (gardenController == null ||
+            gardenController.ambienceSource == null ||
+            gardenController.jungleClip == null)
+        {
+            return;
+        }
+
+        gardenController.ambienceSource.Stop();
+        gardenController.ambienceSource.clip = gardenController.jungleClip;
+        gardenController.ambienceSource.loop = true;
+        gardenController.ambienceSource.volume = 0.05f;
+        gardenController.ambienceSource.Play();
     }
 
     private void StartEndUIRoutine(IEnumerator routine)

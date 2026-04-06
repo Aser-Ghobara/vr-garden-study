@@ -119,11 +119,6 @@ public class TrialManager : MonoBehaviour
     Trial selected = trials[index];
     Debug.Log($"Manually starting trial {selected.trialIndex}: {selected.responsiveness} + {selected.haptic}");
 
-    if (transitionController != null)
-    {
-        transitionController.TeleportToCabin();
-    }
-
     StartCoroutine(experimentFlow.RunTrialSequence(selected));
 }
 }
