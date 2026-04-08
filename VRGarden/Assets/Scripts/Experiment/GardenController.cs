@@ -138,6 +138,16 @@ public class GardenController : MonoBehaviour
         StartManagedGardenSequence(RunResponsiveSequence());
     }
 
+    public void StartResponsiveSequenceFromPhase2()
+    {
+        StartManagedGardenSequence(RunResponsiveSequence(skipPhase1: true));
+    }
+
+    public void StartResponsiveSequenceFromPhase3()
+    {
+        StartManagedGardenSequence(RunResponsiveSequence(skipPhase1: true, skipPhase2: true));
+    }
+
     public void ConfigureRecoveryHaptics(string eventName)
     {
         recoveryHapticEventName = eventName;
@@ -214,7 +224,7 @@ public class GardenController : MonoBehaviour
         InitializeFadeCanvas();
     }
 
-    private IEnumerator RunResponsiveSequence()
+    private IEnumerator RunResponsiveSequence(bool skipPhase1 = false, bool skipPhase2 = false)
     {
         if (ttfeController == null)
         {
@@ -225,16 +235,7 @@ public class GardenController : MonoBehaviour
         const float phase2Duration = 15f;
         const float phase3Duration = 25f;
         const float recoveryDuration = 25f;
-
-        // PHASE 1 (0-15s): calm baseline.
-        if (phase1Skybox != null)
-        {
-            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () => SetActiveLight(sunLight)));
-        }
-        else
-        {
-            SetActiveLight(sunLight);
-        }
+        float t = 0f;
 
         SetRainGroupActive(false);
         StopRainSystems();
@@ -244,42 +245,63 @@ public class GardenController : MonoBehaviour
         SetRecoveryButterflyActive(false);
         SetRecoveryDeerActive(false);
 
-        ttfeController.SetSeason(0f);
-        ttfeController.SetWindSpeed(2f);
-        ttfeController.SetWindStrength(0.5f);
-        RenderSettings.fogDensity = 0f;
-        SetRainEmissionRate(0f);
-
-        float t = 0f;
-        while (t < phase1Duration)
+        if (!skipPhase1)
         {
-            t += Time.deltaTime;
-            yield return null;
+            // PHASE 1 (0-15s): calm baseline.
+            if (phase1Skybox != null)
+            {
+                yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () => SetActiveLight(sunLight)));
+            }
+            else
+            {
+                SetActiveLight(sunLight);
+            }
+
+            ttfeController.SetSeason(0f);
+            ttfeController.SetWindSpeed(2f);
+            ttfeController.SetWindStrength(0.5f);
+            RenderSettings.fogDensity = 0f;
+            SetRainEmissionRate(0f);
+
+            float phase1Elapsed = 0f;
+            while (phase1Elapsed < phase1Duration)
+            {
+                phase1Elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+        else
+        {
+            SetRainEmissionRate(0f);
         }
 
-        // PHASE 2 (15-30s): moderate escalation.
-        if (phase2Skybox != null)
+        if (!skipPhase2)
         {
-            yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
-        }
+            // PHASE 2 (15-30s): moderate escalation.
+            if (phase2Skybox != null)
+            {
+                yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
+            }
 
-        t = 0f;
-        while (t < phase2Duration)
-        {
-            float p = t / phase2Duration;
+            t = 0f;
+            while (t < phase2Duration)
+            {
+                float p = t / phase2Duration;
 
-            ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
-            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
-            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
-            RenderSettings.fogDensity = Mathf.Lerp(0f, 0.01f, p);
+                ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
+                ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
+                ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
+                RenderSettings.fogDensity = Mathf.Lerp(0f, 0.01f, p);
 
-            t += Time.deltaTime;
-            yield return null;
+                t += Time.deltaTime;
+                yield return null;
+            }
         }
 
         ttfeController.SetSeason(1f);
         ttfeController.SetWindSpeed(2.5f);
         ttfeController.SetWindStrength(0.7f);
+        RenderSettings.fogDensity = 0.01f;
 
         // PHASE 3 (30-45s): storm escalation.
         float totalElapsed = 0f;

@@ -13,6 +13,7 @@ public class VideoPhaseController : MonoBehaviour
     public GardenController gardenController;
 
     [Header("Head-Locked Video")]
+    public bool headLockVideo = false;
     public Transform targetCamera;
     public float distanceFromCamera = 2f;
     public float verticalOffset = 0f;
@@ -20,6 +21,7 @@ public class VideoPhaseController : MonoBehaviour
     public Vector3 rotationOffsetEuler;
 
     [Header("Head-Locked Reflection")]
+    public bool headLockReflection = false;
     public Transform reflectionFollowTarget;
     public float reflectionDistanceFromCamera = 1.5f;
     public float reflectionVerticalOffset = 0f;
@@ -42,34 +44,24 @@ public class VideoPhaseController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (videoGroup == null || !videoGroup.activeInHierarchy || videoPlayer == null)
+        if (headLockVideo && videoGroup != null && videoGroup.activeInHierarchy && videoPlayer != null)
         {
-            UpdateReflectionGroupHeadLock();
-            UpdatePostRecoveryGroupHeadLock();
-            UpdateEndUIHeadLock();
-            return;
+            Transform cameraTransform = GetTargetCamera();
+            if (cameraTransform != null)
+            {
+                Transform screenTransform = videoPlayer.transform;
+                Vector3 desiredPosition =
+                    cameraTransform.position +
+                    cameraTransform.forward * distanceFromCamera +
+                    cameraTransform.up * verticalOffset +
+                    cameraTransform.right * horizontalOffset;
+
+                screenTransform.position = desiredPosition;
+                screenTransform.rotation =
+                    Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
+                    Quaternion.Euler(rotationOffsetEuler);
+            }
         }
-
-        Transform cameraTransform = GetTargetCamera();
-        if (cameraTransform == null)
-        {
-            UpdateReflectionGroupHeadLock();
-            UpdatePostRecoveryGroupHeadLock();
-            UpdateEndUIHeadLock();
-            return;
-        }
-
-        Transform screenTransform = videoPlayer.transform;
-        Vector3 desiredPosition =
-            cameraTransform.position +
-            cameraTransform.forward * distanceFromCamera +
-            cameraTransform.up * verticalOffset +
-            cameraTransform.right * horizontalOffset;
-
-        screenTransform.position = desiredPosition;
-        screenTransform.rotation =
-            Quaternion.LookRotation(cameraTransform.position - desiredPosition, cameraTransform.up) *
-            Quaternion.Euler(rotationOffsetEuler);
 
         UpdateReflectionGroupHeadLock();
         UpdatePostRecoveryGroupHeadLock();
@@ -188,6 +180,11 @@ public class VideoPhaseController : MonoBehaviour
 
     private void UpdateReflectionGroupHeadLock()
     {
+        if (!headLockReflection)
+        {
+            return;
+        }
+
         UpdateHeadLockedGroup(
             reflectionGroup,
             GetReflectionFollowTarget(),

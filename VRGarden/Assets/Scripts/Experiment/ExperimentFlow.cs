@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using System.Text;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
@@ -50,10 +51,13 @@ public class ExperimentFlow : MonoBehaviour
     public string participantId = "participant";
     [Tooltip("Folder name inside Application.persistentDataPath where reflection recordings are saved.")]
     public string reflectionRecordingFolderName = "ReflectionRecordings";
+    [Tooltip("Optional: existing reflection prompt text that will display the countdown.")]
+    public TMP_Text reflectionPromptText;
 
     private Coroutine startVideoRoutine;
     private Coroutine delayedHapticRoutine;
     private Coroutine endUIRoutine;
+    private string reflectionPromptBaseText;
 
     private void Start()
     {
@@ -262,8 +266,8 @@ public class ExperimentFlow : MonoBehaviour
             yield break;
         }
 
-        Debug.Log("Responsive trial: running garden sequence.");
-        gardenController.StartResponsiveSequence();
+        Debug.Log("Responsive trial: running garden sequence from phase 3 after reflection.");
+        gardenController.StartResponsiveSequenceFromPhase3();
         yield return new WaitUntil(() => gardenController == null || !gardenController.IsSequenceRunning);
         ShowEndUI();
     }
@@ -341,10 +345,13 @@ public class ExperimentFlow : MonoBehaviour
         const int sampleRate = 44100;
         const string microphoneDeviceName = null;
 
+        CacheReflectionPromptBaseText();
+
         if (Microphone.devices == null || Microphone.devices.Length == 0)
         {
             Debug.LogWarning("ExperimentFlow: No microphone device found. Reflection recording skipped.");
-            yield return new WaitForSeconds(recordingLengthSeconds);
+            yield return StartCoroutine(UpdateReflectionCountdown(recordingLengthSeconds));
+            ResetReflectionPromptText();
             yield break;
         }
 
@@ -352,11 +359,12 @@ public class ExperimentFlow : MonoBehaviour
         if (recordedClip == null)
         {
             Debug.LogWarning("ExperimentFlow: Microphone.Start returned null. Reflection recording skipped.");
-            yield return new WaitForSeconds(recordingLengthSeconds);
+            yield return StartCoroutine(UpdateReflectionCountdown(recordingLengthSeconds));
+            ResetReflectionPromptText();
             yield break;
         }
 
-        yield return new WaitForSeconds(recordingLengthSeconds);
+        yield return StartCoroutine(UpdateReflectionCountdown(recordingLengthSeconds));
 
         int recordedSamples = Microphone.GetPosition(microphoneDeviceName);
         if (recordedSamples <= 0)
@@ -369,6 +377,8 @@ public class ExperimentFlow : MonoBehaviour
             Microphone.End(microphoneDeviceName);
         }
 
+        ResetReflectionPromptText();
+
         if (recordedSamples <= 0)
         {
             Debug.LogWarning("ExperimentFlow: Reflection recording captured no samples.");
@@ -376,6 +386,49 @@ public class ExperimentFlow : MonoBehaviour
         }
 
         SaveReflectionClip(recordedClip, recordedSamples, recordingLabel);
+    }
+
+    private void CacheReflectionPromptBaseText()
+    {
+        if (reflectionPromptText == null)
+        {
+            return;
+        }
+
+        reflectionPromptBaseText = reflectionPromptText.text;
+    }
+
+    private IEnumerator UpdateReflectionCountdown(float durationSeconds)
+    {
+        if (reflectionPromptText == null)
+        {
+            yield return new WaitForSeconds(durationSeconds);
+            yield break;
+        }
+
+        float remainingTime = Mathf.Max(0f, durationSeconds);
+        while (remainingTime > 0f)
+        {
+            int secondsRemaining = Mathf.CeilToInt(remainingTime);
+            int minutes = secondsRemaining / 60;
+            int seconds = secondsRemaining % 60;
+            reflectionPromptText.text = $"{reflectionPromptBaseText}\n{minutes}:{seconds:00}";
+
+            yield return null;
+            remainingTime -= Time.deltaTime;
+        }
+
+        reflectionPromptText.text = $"{reflectionPromptBaseText}\n0:00";
+    }
+
+    private void ResetReflectionPromptText()
+    {
+        if (reflectionPromptText == null)
+        {
+            return;
+        }
+
+        reflectionPromptText.text = reflectionPromptBaseText;
     }
 
     private void SaveReflectionClip(AudioClip sourceClip, int recordedSamples, string recordingLabel)

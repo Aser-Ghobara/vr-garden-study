@@ -20,5 +20,7 @@ namespace Bhaptics.SDK2
         public const string HAPPY = "happy";
         
         public const string SAD = "sad";
+        
+        public const string RAINHAPTIC = "rainhaptic";
     }
 }
