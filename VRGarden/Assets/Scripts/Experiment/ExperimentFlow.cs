@@ -205,8 +205,21 @@ public class ExperimentFlow : MonoBehaviour
         videoPhaseController.StartVideoPhase();
         yield return new WaitUntil(() => reflectionGroup != null && reflectionGroup.activeSelf);
 
-        Debug.Log("ExperimentFlow: Starting 20-second reflection recording.");
-        yield return StartCoroutine(RecordAndSaveReflectionAudio($"trial_{trial.trialIndex}"));
+        bool isResponsive = trial.responsiveness == TrialManager.ResponsivenessType.Responsive;
+        int reflectionDurationSeconds = isResponsive ? 30 : 20;
+
+        if (isResponsive)
+        {
+            if (gardenGroup != null)
+            {
+                gardenGroup.SetActive(true);
+            }
+            yield return gardenController.StartPhase3InitialFade();
+            gardenController.StartPhase3Buildup(reflectionDurationSeconds);
+        }
+
+        Debug.Log($"ExperimentFlow: Starting {reflectionDurationSeconds}-second reflection recording.");
+        yield return StartCoroutine(RecordAndSaveReflectionAudio($"trial_{trial.trialIndex}", reflectionDurationSeconds));
 
         Debug.Log("ExperimentFlow: Reflection phase complete.");
 
@@ -220,7 +233,10 @@ public class ExperimentFlow : MonoBehaviour
             gardenGroup.SetActive(true);
         }
 
-        RestoreGardenAmbience();
+        if (!isResponsive)
+        {
+            RestoreGardenAmbience();
+        }
 
         if (gardenController == null)
         {
@@ -254,7 +270,7 @@ public class ExperimentFlow : MonoBehaviour
             gardenController.ConfigureRecoveryLighting(trial.trialIndex == 0);
         }
 
-        if (trial.responsiveness == TrialManager.ResponsivenessType.NonResponsive)
+        if (!isResponsive)
         {
             if (trial.haptic == TrialManager.HapticType.Haptic)
             {
@@ -339,9 +355,9 @@ public class ExperimentFlow : MonoBehaviour
         gardenController.ambienceSource.Play();
     }
 
-    private IEnumerator RecordAndSaveReflectionAudio(string recordingLabel)
+    private IEnumerator RecordAndSaveReflectionAudio(string recordingLabel, int durationSeconds = 20)
     {
-        const int recordingLengthSeconds = 20;
+        int recordingLengthSeconds = durationSeconds;
         const int sampleRate = 44100;
         const string microphoneDeviceName = null;
 

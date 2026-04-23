@@ -59,6 +59,7 @@ public class GardenController : MonoBehaviour
     private Coroutine activeGardenSequence;
     private Coroutine lightningFlashCoroutine;
     private Coroutine skyboxFadeCoroutine;
+    private Coroutine phase3BuildupCoroutine;
     private CanvasGroup activeFadeCanvasGroup;
     private CanvasGroup runtimeFadeCanvasGroup;
     private Canvas runtimeFadeCanvas;
@@ -145,7 +146,7 @@ public class GardenController : MonoBehaviour
 
     public void StartResponsiveSequenceFromPhase3()
     {
-        StartManagedGardenSequence(RunResponsiveSequence(skipPhase1: true, skipPhase2: true));
+        StartManagedGardenSequence(RunResponsiveSequence(skipPhase1: true, skipPhase2: true, rainAlreadyStarted: true));
     }
 
     public void ConfigureRecoveryHaptics(string eventName)
@@ -201,12 +202,97 @@ public class GardenController : MonoBehaviour
         activeGardenSequence = null;
     }
 
+    public Coroutine StartPhase3InitialFade()
+    {
+        return StartCoroutine(PerformPhase3InitialFade());
+    }
+
+    private IEnumerator PerformPhase3InitialFade()
+    {
+        if (phase2Skybox != null)
+        {
+            yield return StartCoroutine(SwapSkyboxWithFade(phase2Skybox));
+        }
+    }
+
+    public void StartPhase3Buildup(float duration)
+    {
+        if (phase3BuildupCoroutine != null)
+        {
+            StopCoroutine(phase3BuildupCoroutine);
+        }
+        phase3BuildupCoroutine = StartCoroutine(RunPhase3Buildup(duration));
+    }
+
+    private IEnumerator RunPhase3Buildup(float duration)
+    {
+        if (ttfeController == null)
+        {
+            phase3BuildupCoroutine = null;
+            yield break;
+        }
+
+        const float rainStartTime = 20f;
+
+        float elapsed = 0f;
+        float clampedDuration = Mathf.Max(0.1f, duration);
+        bool rainStarted = false;
+
+        while (elapsed < clampedDuration)
+        {
+            float p = elapsed / clampedDuration;
+            ttfeController.SetSeason(Mathf.Lerp(0f, 1f, p));
+            ttfeController.SetWindSpeed(Mathf.Lerp(2f, 2.5f, p));
+            ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 0.7f, p));
+            RenderSettings.fogDensity = Mathf.Lerp(0f, 0.01f, p);
+
+            if (!rainStarted && elapsed >= rainStartTime)
+            {
+                rainStarted = true;
+                SetRainGroupActive(true);
+                ConfigureRainSystem();
+                PlayRainSystems();
+
+                if (ambienceSource != null && rainClip != null)
+                {
+                    ambienceSource.Stop();
+                    ambienceSource.clip = rainClip;
+                    ambienceSource.loop = true;
+                    ambienceSource.volume = 0f;
+                    ambienceSource.Play();
+                    StartCoroutine(FadeAmbienceVolume(ambienceVolume, 2f));
+                }
+            }
+
+            if (rainStarted)
+            {
+                float rainProgress = Mathf.Clamp01((elapsed - rainStartTime) / (clampedDuration - rainStartTime));
+                SetRainEmissionRate(Mathf.Lerp(0f, 750f, rainProgress));
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        ttfeController.SetSeason(1f);
+        ttfeController.SetWindSpeed(2.5f);
+        ttfeController.SetWindStrength(0.7f);
+        RenderSettings.fogDensity = 0.01f;
+        phase3BuildupCoroutine = null;
+    }
+
     private void StopActiveGardenSequence()
     {
         if (activeGardenSequence != null)
         {
             StopCoroutine(activeGardenSequence);
             activeGardenSequence = null;
+        }
+
+        if (phase3BuildupCoroutine != null)
+        {
+            StopCoroutine(phase3BuildupCoroutine);
+            phase3BuildupCoroutine = null;
         }
 
         if (lightningFlashCoroutine != null)
@@ -224,7 +310,7 @@ public class GardenController : MonoBehaviour
         InitializeFadeCanvas();
     }
 
-    private IEnumerator RunResponsiveSequence(bool skipPhase1 = false, bool skipPhase2 = false)
+    private IEnumerator RunResponsiveSequence(bool skipPhase1 = false, bool skipPhase2 = false, bool rainAlreadyStarted = false)
     {
         if (ttfeController == null)
         {
@@ -233,12 +319,15 @@ public class GardenController : MonoBehaviour
 
         const float phase1Duration = 15f;
         const float phase2Duration = 15f;
-        const float phase3Duration = 25f;
-        const float recoveryDuration = 25f;
+        const float phase3Duration = 30f;
+        const float recoveryDuration = 45f;
         float t = 0f;
 
-        SetRainGroupActive(false);
-        StopRainSystems();
+        if (!rainAlreadyStarted)
+        {
+            SetRainGroupActive(false);
+            StopRainSystems();
+        }
         SetLightningGroupActive(false);
         StopLightningSystems();
         SetRecoveryBirdFlockActive(false);
@@ -270,7 +359,7 @@ public class GardenController : MonoBehaviour
                 yield return null;
             }
         }
-        else
+        else if (!rainAlreadyStarted)
         {
             SetRainEmissionRate(0f);
         }
@@ -316,27 +405,34 @@ public class GardenController : MonoBehaviour
             SetActiveLight(duskLight);
         }
 
-        SetRainGroupActive(true);
-        ConfigureRainSystem();
-        PlayRainSystems();
-
-        SetLightningGroupActive(true);
-
-        if (ambienceSource != null && rainClip != null)
+        if (!rainAlreadyStarted)
         {
-            ambienceSource.Stop();
-            ambienceSource.clip = rainClip;
-            ambienceSource.loop = true;
-            ambienceSource.volume = 0f;
-            ambienceSource.Play();
-            StartCoroutine(FadeAmbienceVolume(ambienceVolume, 2f));
+            SetRainGroupActive(true);
+            ConfigureRainSystem();
+            PlayRainSystems();
+
+            if (ambienceSource != null && rainClip != null)
+            {
+                ambienceSource.Stop();
+                ambienceSource.clip = rainClip;
+                ambienceSource.loop = true;
+                ambienceSource.volume = 0f;
+                ambienceSource.Play();
+                StartCoroutine(FadeAmbienceVolume(ambienceVolume, 2f));
+            }
+            else
+            {
+                Debug.LogWarning("GardenController: ambienceSource or rainClip missing at Phase 3 start.");
+            }
+
+            nextLightningAt = totalElapsed + Mathf.Max(0f, phase3LightningDelayAfterRain);
         }
         else
         {
-            Debug.LogWarning("GardenController: ambienceSource or rainClip missing at Phase 3 start.");
+            nextLightningAt = totalElapsed + 2f;
         }
 
-        nextLightningAt = totalElapsed + Mathf.Max(0f, phase3LightningDelayAfterRain);
+        SetLightningGroupActive(true);
 
         float phase3Elapsed = 0f;
         while (phase3Elapsed < phase3Duration)
@@ -347,7 +443,7 @@ public class GardenController : MonoBehaviour
             ttfeController.SetWindStrength(Mathf.Lerp(0.5f, 1f, p));
             RenderSettings.fogDensity = Mathf.Lerp(0.01f, 0.03f, p);
 
-            SetRainEmissionRate(Mathf.Lerp(0f, 3000f, p));
+            SetRainEmissionRate(rainAlreadyStarted ? Mathf.Lerp(750f, 3000f, p) : Mathf.Lerp(0f, 3000f, p));
 
             if (totalElapsed >= nextLightningAt)
             {
@@ -386,7 +482,15 @@ public class GardenController : MonoBehaviour
             lightningFlashCoroutine = null;
         }
 
-        if (ambienceSource != null)
+        if (ambienceSource != null && jungleClip != null)
+        {
+            ambienceSource.Stop();
+            ambienceSource.clip = jungleClip;
+            ambienceSource.loop = true;
+            ambienceSource.volume = ambienceVolume;
+            ambienceSource.Play();
+        }
+        else if (ambienceSource != null)
         {
             ambienceSource.Stop();
         }
@@ -420,7 +524,7 @@ public class GardenController : MonoBehaviour
             StartRecoveryButterfly();
         }
 
-        const float recoveryTransitionDuration = 10f;
+        const float recoveryTransitionDuration = 15f;
 
         t = 0f;
         while (t < recoveryTransitionDuration)
