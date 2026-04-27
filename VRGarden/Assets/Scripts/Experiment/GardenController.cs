@@ -66,6 +66,7 @@ public class GardenController : MonoBehaviour
     private CanvasGroup runtimeFadeCanvasGroup;
     private Canvas runtimeFadeCanvas;
     private RectTransform runtimeFadeCanvasRect;
+    private string phase3HapticEventName;
     private string recoveryHapticEventName;
     private bool useMidDayLightForRecoveryStart;
     private const float RainLoopDuration = 20f;
@@ -156,6 +157,11 @@ public class GardenController : MonoBehaviour
     public void ConfigureRecoveryHaptics(string eventName)
     {
         recoveryHapticEventName = eventName;
+    }
+
+    public void ConfigurePhase3Haptics(string eventName)
+    {
+        phase3HapticEventName = eventName;
     }
 
     public void ConfigureRecoveryLighting(bool useMidDayLight)
@@ -419,6 +425,8 @@ public class GardenController : MonoBehaviour
             SetActiveLight(duskLight);
         }
 
+        PlayPhase3HapticIfConfigured();
+
         if (!rainAlreadyStarted)
         {
             SetRainGroupActive(true);
@@ -514,6 +522,8 @@ public class GardenController : MonoBehaviour
             sfxSource.Stop();
         }
 
+        StopPhase3HapticIfConfigured();
+
         SetPostPhase3DeerActive(true);
         SetPostPhase3FoxActive(true);
 
@@ -578,6 +588,7 @@ public class GardenController : MonoBehaviour
             ambienceSource.Play();
         }
 
+        phase3HapticEventName = null;
         recoveryHapticEventName = null;
         useMidDayLightForRecoveryStart = false;
     }
@@ -612,6 +623,7 @@ public class GardenController : MonoBehaviour
     public void ResetGardenToNeutral()
     {
         StopActiveGardenSequence();
+        phase3HapticEventName = null;
         recoveryHapticEventName = null;
         useMidDayLightForRecoveryStart = false;
 
@@ -1176,6 +1188,32 @@ public class GardenController : MonoBehaviour
         }
 
         hapticsController.LoopHaptic(recoveryHapticEventName);
+    }
+
+    private void PlayPhase3HapticIfConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(phase3HapticEventName))
+        {
+            return;
+        }
+
+        if (hapticsController == null)
+        {
+            Debug.LogWarning("GardenController: HapticsController is not assigned for phase 3 haptics.");
+            return;
+        }
+
+        hapticsController.LoopHaptic(phase3HapticEventName);
+    }
+
+    private void StopPhase3HapticIfConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(phase3HapticEventName) || hapticsController == null)
+        {
+            return;
+        }
+
+        hapticsController.StopAllHaptics();
     }
 
     private void CachePrimaryRainSystem()

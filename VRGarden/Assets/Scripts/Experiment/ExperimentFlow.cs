@@ -40,10 +40,13 @@ public class ExperimentFlow : MonoBehaviour
     public Button startGardenButton;
 
     [Header("bHaptics Events")]
+    [Tooltip("Plays during phase 3 for responsive + haptic trials.")]
+    public string responsivePhase3HapticEventName;
+
     [Tooltip("Plays during the recovery phase for responsive + haptic trials.")]
     public string responsiveRecoveryHapticEventName;
 
-    [Tooltip("Plays 5 seconds after arriving in the garden for non-responsive + haptic trials.")]
+    [Tooltip("Plays after reflection for non-responsive + haptic trials.")]
     public string nonResponsiveGardenHapticEventName;
 
     [Header("Reflection Recording")]
@@ -192,6 +195,7 @@ public class ExperimentFlow : MonoBehaviour
         if (gardenController != null)
         {
             gardenController.ResetGardenToNeutral();
+            gardenController.ConfigurePhase3Haptics(null);
             gardenController.ConfigureRecoveryHaptics(null);
         }
 
@@ -281,6 +285,7 @@ public class ExperimentFlow : MonoBehaviour
         {
             if (gardenController != null)
             {
+                gardenController.ConfigurePhase3Haptics(responsivePhase3HapticEventName);
                 gardenController.ConfigureRecoveryHaptics(responsiveRecoveryHapticEventName);
             }
         }
@@ -288,6 +293,7 @@ public class ExperimentFlow : MonoBehaviour
         {
             if (gardenController != null)
             {
+                gardenController.ConfigurePhase3Haptics(null);
                 gardenController.ConfigureRecoveryHaptics(null);
             }
         }
@@ -301,7 +307,7 @@ public class ExperimentFlow : MonoBehaviour
         {
             if (trial.haptic == TrialManager.HapticType.Haptic)
             {
-                StartNonResponsiveDelayedHaptic();
+                StartNonResponsiveHapticAfterReflection();
             }
 
             Debug.Log("Non-responsive trial: garden stays neutral.");
@@ -315,20 +321,18 @@ public class ExperimentFlow : MonoBehaviour
         ShowEndUI();
     }
 
-    private void StartNonResponsiveDelayedHaptic()
+    private void StartNonResponsiveHapticAfterReflection()
     {
         if (delayedHapticRoutine != null)
         {
             StopCoroutine(delayedHapticRoutine);
         }
 
-        delayedHapticRoutine = StartCoroutine(PlayNonResponsiveHapticAfterDelay());
+        delayedHapticRoutine = StartCoroutine(PlayNonResponsiveHapticAfterReflection());
     }
 
-    private IEnumerator PlayNonResponsiveHapticAfterDelay()
+    private IEnumerator PlayNonResponsiveHapticAfterReflection()
     {
-        yield return new WaitForSeconds(5f);
-
         if (hapticsController == null)
         {
             Debug.LogWarning("ExperimentFlow: HapticsController is not assigned.");
@@ -363,6 +367,17 @@ public class ExperimentFlow : MonoBehaviour
         if (externalHapticsController != null)
         {
             externalHapticsController.StopHaptics();
+        }
+    }
+
+    public void ForceStopHaptics()
+    {
+        StopAllHaptics();
+
+        if (gardenController != null)
+        {
+            gardenController.ConfigurePhase3Haptics(null);
+            gardenController.ConfigureRecoveryHaptics(null);
         }
     }
 
