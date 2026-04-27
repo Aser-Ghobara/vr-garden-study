@@ -524,28 +524,30 @@ public class GardenController : MonoBehaviour
 
         StopPhase3HapticIfConfigured();
 
-        SetPostPhase3DeerActive(true);
-        SetPostPhase3FoxActive(true);
-
         // RECOVERY: swap back immediately, then settle quickly and remain recovered.
         Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
             ? midDayLight
             : sunLight;
-        StartRecoveryBirdFlock();
-        StartRecoveryDeer();
 
         if (phase1Skybox != null)
         {
             yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () =>
             {
+                SetPostPhase3DeerActive(true);
+                SetPostPhase3FoxActive(true);
+                StartRecoveryBirdFlock();
+                StartRecoveryDeer();
+                StartRecoveryButterfly();
                 SetActiveLight(recoveryStartLight);
                 PlayRecoveryHapticIfConfigured();
             }));
-
-            StartRecoveryButterfly();
         }
         else
         {
+            SetPostPhase3DeerActive(true);
+            SetPostPhase3FoxActive(true);
+            StartRecoveryBirdFlock();
+            StartRecoveryDeer();
             SetActiveLight(recoveryStartLight);
             PlayRecoveryHapticIfConfigured();
             StartRecoveryButterfly();
@@ -974,6 +976,7 @@ public class GardenController : MonoBehaviour
         {
             LogFadeDebug($"SwapSkyboxWithFade applying '{targetSkybox.name}' without fade because no fade canvas is available.");
             ApplySkybox(targetSkybox);
+            onBlack?.Invoke();
             yield break;
         }
 

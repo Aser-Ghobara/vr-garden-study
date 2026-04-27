@@ -8,6 +8,15 @@ public class GroundWaypointWalker : MonoBehaviour
     public bool startAtClosestWaypoint = true;
     public bool lockYToStartHeight = true;
 
+    [Header("Ground Following")]
+    public bool followGround = false;
+    public LayerMask groundLayers = ~0;
+    public float groundRaycastHeight = 5f;
+    public float groundRaycastDistance = 15f;
+    public float groundOffset = 0f;
+    public bool alignToGroundNormal = false;
+    public float groundAlignSpeed = 8f;
+
     [Header("Movement")]
     public float moveSpeed = 1.5f;
     public float turnSpeed = 4f;
@@ -58,7 +67,11 @@ public class GroundWaypointWalker : MonoBehaviour
         Vector3 currentPosition = transform.position;
         Vector3 targetPosition = targetWaypoint.position;
 
-        if (lockYToStartHeight)
+        if (followGround)
+        {
+            targetPosition.y = currentPosition.y;
+        }
+        else if (lockYToStartHeight)
         {
             targetPosition.y = lockedY;
         }
@@ -76,6 +89,8 @@ public class GroundWaypointWalker : MonoBehaviour
 
         Vector3 moveDirection = toTarget.normalized;
         Vector3 flatDirection = new Vector3(moveDirection.x, 0f, moveDirection.z);
+        Vector3 groundNormal = Vector3.up;
+        bool hasGroundNormal = false;
 
         if (flatDirection.sqrMagnitude > 0.0001f)
         {
@@ -83,8 +98,54 @@ public class GroundWaypointWalker : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
         }
 
-        transform.position = Vector3.MoveTowards(currentPosition, targetPosition, moveSpeed * Time.deltaTime);
+        Vector3 nextPosition = Vector3.MoveTowards(currentPosition, targetPosition, moveSpeed * Time.deltaTime);
+
+        if (followGround && TryGetGroundedPosition(nextPosition, out Vector3 groundedPosition, out groundNormal))
+        {
+            nextPosition = groundedPosition;
+            hasGroundNormal = true;
+        }
+
+        transform.position = nextPosition;
+
+        if (followGround && alignToGroundNormal && hasGroundNormal)
+        {
+            AlignRotationToGround(flatDirection, groundNormal);
+        }
+
         SetAnimatorMoving(true);
+    }
+
+    private bool TryGetGroundedPosition(Vector3 position, out Vector3 groundedPosition, out Vector3 groundNormal)
+    {
+        Vector3 rayStart = position + Vector3.up * Mathf.Max(0f, groundRaycastHeight);
+        float rayDistance = Mathf.Max(0.01f, groundRaycastHeight + groundRaycastDistance);
+
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, rayDistance, groundLayers, QueryTriggerInteraction.Ignore))
+        {
+            groundedPosition = hit.point + hit.normal * groundOffset;
+            groundNormal = hit.normal;
+            return true;
+        }
+
+        groundedPosition = position;
+        groundNormal = Vector3.up;
+        return false;
+    }
+
+    private void AlignRotationToGround(Vector3 flatDirection, Vector3 groundNormal)
+    {
+        Vector3 forward = flatDirection.sqrMagnitude > 0.0001f
+            ? Vector3.ProjectOnPlane(flatDirection, groundNormal).normalized
+            : Vector3.ProjectOnPlane(transform.forward, groundNormal).normalized;
+
+        if (forward.sqrMagnitude <= 0.0001f)
+        {
+            return;
+        }
+
+        Quaternion targetRotation = Quaternion.LookRotation(forward, groundNormal);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, groundAlignSpeed * Time.deltaTime);
     }
 
     private void InitializePath()
