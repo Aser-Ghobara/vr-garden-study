@@ -9,6 +9,8 @@ public class TrialTransitionController : MonoBehaviour
     public Transform cabinSpawnPoint;
     public CanvasGroup fadeCanvasGroup;
     public GardenController gardenController;
+    public float fallbackFadeDuration = 2f;
+    public float fallbackFadeHoldDuration = 0.25f;
     public bool preferRuntimeCameraFadeOverlay = true;
     public float runtimeFadeOverlayDistance = 0.15f;
     public float runtimeFadeOverlayMargin = 1.25f;
@@ -47,6 +49,11 @@ public class TrialTransitionController : MonoBehaviour
 
     public IEnumerator DoTransition()
     {
+        yield return StartCoroutine(DoTransition(null));
+    }
+
+    public IEnumerator DoTransition(System.Action onBlack)
+    {
         RefreshActiveFadeCanvasGroup();
 
         if (activeFadeCanvasGroup == null)
@@ -67,12 +74,19 @@ public class TrialTransitionController : MonoBehaviour
             yield break;
         }
 
-        float fadeDuration = 0.6f;
+        float fadeDuration = GetFadeDuration();
+        float fadeHoldDuration = GetFadeHoldDuration();
         UpdateRuntimeFadeCanvasPlacement();
         activeFadeCanvasGroup.gameObject.SetActive(true);
         activeFadeCanvasGroup.alpha = 0f;
         yield return StartCoroutine(FadeCanvasAlpha(0f, 1f, fadeDuration));
         xrOrigin.transform.position = gardenSpawnPoint.position;
+        onBlack?.Invoke();
+
+        if (fadeHoldDuration > 0f)
+        {
+            yield return new WaitForSeconds(fadeHoldDuration);
+        }
 
         // Re-enable jungle ambience before season escalation begins.
         if (gardenController != null && gardenController.ambienceSource != null && gardenController.jungleClip != null)
@@ -91,6 +105,20 @@ public class TrialTransitionController : MonoBehaviour
         yield return StartCoroutine(FadeCanvasAlpha(1f, 0f, fadeDuration));
 
         activeFadeCanvasGroup.gameObject.SetActive(false);
+    }
+
+    private float GetFadeDuration()
+    {
+        return gardenController != null
+            ? gardenController.skyboxFadeDuration
+            : fallbackFadeDuration;
+    }
+
+    private float GetFadeHoldDuration()
+    {
+        return gardenController != null
+            ? gardenController.skyboxFadeHoldDuration
+            : fallbackFadeHoldDuration;
     }
 
     private IEnumerator FadeCanvasAlpha(float startAlpha, float endAlpha, float duration)

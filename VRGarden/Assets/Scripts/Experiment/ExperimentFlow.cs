@@ -202,20 +202,47 @@ public class ExperimentFlow : MonoBehaviour
             reflectionGroup.SetActive(false);
         }
 
-        videoPhaseController.StartVideoPhase();
-        yield return new WaitUntil(() => reflectionGroup != null && reflectionGroup.activeSelf);
+        videoPhaseController.StartVideoPhase(false);
+        yield return new WaitUntil(() => videoPhaseController == null || videoPhaseController.IsVideoPhaseComplete);
 
         bool isResponsive = trial.responsiveness == TrialManager.ResponsivenessType.Responsive;
-        int reflectionDurationSeconds = isResponsive ? 30 : 20;
+        int reflectionDurationSeconds = 30;
 
         if (isResponsive)
         {
+            if (reflectionGroup != null)
+            {
+                reflectionGroup.SetActive(false);
+            }
+
             if (gardenGroup != null)
             {
                 gardenGroup.SetActive(true);
             }
-            yield return gardenController.StartPhase3InitialFade();
-            gardenController.StartPhase3Buildup(reflectionDurationSeconds);
+
+            if (transitionController != null)
+            {
+                yield return StartCoroutine(transitionController.DoTransition(
+                    gardenController != null ? gardenController.ApplyPhase3InitialStateImmediate : null));
+            }
+            else if (gardenController != null)
+            {
+                yield return gardenController.StartPhase3InitialFade();
+            }
+
+            if (gardenController != null)
+            {
+                gardenController.StartPhase3Buildup(reflectionDurationSeconds);
+            }
+
+            if (reflectionGroup != null)
+            {
+                reflectionGroup.SetActive(true);
+            }
+        }
+        else if (reflectionGroup != null)
+        {
+            reflectionGroup.SetActive(true);
         }
 
         Debug.Log($"ExperimentFlow: Starting {reflectionDurationSeconds}-second reflection recording.");

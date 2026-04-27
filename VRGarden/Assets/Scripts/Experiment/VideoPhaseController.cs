@@ -11,6 +11,7 @@ public class VideoPhaseController : MonoBehaviour
     public GameObject postRecoveryGroup;
     public GameObject endUIGroup;
     public GardenController gardenController;
+    public bool IsVideoPhaseComplete { get; private set; }
 
     [Header("Head-Locked Video")]
     public bool headLockVideo = false;
@@ -70,7 +71,13 @@ public class VideoPhaseController : MonoBehaviour
 
     public void StartVideoPhase()
     {
+        StartVideoPhase(true);
+    }
+
+    public void StartVideoPhase(bool showReflectionOnEnd)
+    {
         HideEndUI();
+        IsVideoPhaseComplete = false;
 
         if (gardenController != null && gardenController.ambienceSource != null)
         {
@@ -99,10 +106,10 @@ public class VideoPhaseController : MonoBehaviour
         reflectionGroup.SetActive(false);
         videoPlayer.Play();
 
-        StartCoroutine(WaitForVideoEnd());
+        StartCoroutine(WaitForVideoEnd(showReflectionOnEnd));
     }
 
-    private IEnumerator WaitForVideoEnd()
+    private IEnumerator WaitForVideoEnd(bool showReflectionOnEnd)
     {
         if (videoPlayer == null)
         {
@@ -133,7 +140,13 @@ public class VideoPhaseController : MonoBehaviour
         }
 
         videoGroup.SetActive(false);
-        reflectionGroup.SetActive(true);
+
+        if (showReflectionOnEnd)
+        {
+            reflectionGroup.SetActive(true);
+        }
+
+        IsVideoPhaseComplete = true;
     }
 
     private Transform GetTargetCamera()

@@ -207,6 +207,14 @@ public class GardenController : MonoBehaviour
         return StartCoroutine(PerformPhase3InitialFade());
     }
 
+    public void ApplyPhase3InitialStateImmediate()
+    {
+        if (phase2Skybox != null)
+        {
+            ApplySkybox(phase2Skybox);
+        }
+    }
+
     private IEnumerator PerformPhase3InitialFade()
     {
         if (phase2Skybox != null)
