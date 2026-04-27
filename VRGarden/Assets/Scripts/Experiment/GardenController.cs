@@ -53,6 +53,8 @@ public class GardenController : MonoBehaviour
     public GameObject recoveryBirdFlock;
     public GameObject recoveryButterflyPrefab;
     public GameObject recoveryDeer;
+    public GameObject postPhase3Deer;
+    public GameObject postPhase3Fox;
 
     private ParticleSystem rainSystem;
     private ParticleSystem.EmissionModule rainEmission;
@@ -80,6 +82,8 @@ public class GardenController : MonoBehaviour
         SetRecoveryBirdFlockActive(false);
         SetRecoveryButterflyActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
         InitializeFadeCanvas();
 
         // Ensure controlled audio startup behavior.
@@ -341,6 +345,8 @@ public class GardenController : MonoBehaviour
         SetRecoveryBirdFlockActive(false);
         SetRecoveryButterflyActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
 
         if (!skipPhase1)
         {
@@ -508,6 +514,9 @@ public class GardenController : MonoBehaviour
             sfxSource.Stop();
         }
 
+        SetPostPhase3DeerActive(true);
+        SetPostPhase3FoxActive(true);
+
         // RECOVERY: swap back immediately, then settle quickly and remain recovered.
         Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
             ? midDayLight
@@ -619,6 +628,8 @@ public class GardenController : MonoBehaviour
         SetRecoveryBirdFlockActive(false);
         SetRecoveryButterflyActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
 
         if (ttfeController != null)
         {
@@ -705,6 +716,8 @@ public class GardenController : MonoBehaviour
         SetLightningGroupActive(false);
         SetRecoveryBirdFlockActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
 
         ttfeController.SetSeason(-1f);
         ttfeController.SetWindSpeed(1f);
@@ -750,6 +763,8 @@ public class GardenController : MonoBehaviour
         SetLightningGroupActive(false);
         SetRecoveryBirdFlockActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
 
         float phase2Elapsed = 0f;
         while (phase2Elapsed < 30f)
@@ -792,6 +807,8 @@ public class GardenController : MonoBehaviour
         SetLightningGroupActive(true);
         SetRecoveryBirdFlockActive(false);
         SetRecoveryDeerActive(false);
+        SetPostPhase3DeerActive(false);
+        SetPostPhase3FoxActive(false);
 
         // 2) Wait a bit before starting rain ambience.
         float rainDelayElapsed = 0f;
@@ -1284,6 +1301,22 @@ public class GardenController : MonoBehaviour
         if (recoveryDeer != null && recoveryDeer.activeSelf != isActive)
         {
             recoveryDeer.SetActive(isActive);
+        }
+    }
+
+    private void SetPostPhase3DeerActive(bool isActive)
+    {
+        if (postPhase3Deer != null && postPhase3Deer.activeSelf != isActive)
+        {
+            postPhase3Deer.SetActive(isActive);
+        }
+    }
+
+    private void SetPostPhase3FoxActive(bool isActive)
+    {
+        if (postPhase3Fox != null && postPhase3Fox.activeSelf != isActive)
+        {
+            postPhase3Fox.SetActive(isActive);
         }
     }
 
