@@ -49,6 +49,9 @@ public class ExperimentFlow : MonoBehaviour
     [Tooltip("Plays after reflection for non-responsive + haptic trials.")]
     public string nonResponsiveGardenHapticEventName;
 
+    [Tooltip("How often to re-trigger the non-responsive garden haptic if the bHaptics loop stops early.")]
+    public float nonResponsiveGardenHapticRefreshSeconds = 2f;
+
     [Header("Reflection Recording")]
     [Tooltip("Participant identifier included in saved reflection recording filenames.")]
     public string participantId = "participant";
@@ -59,6 +62,7 @@ public class ExperimentFlow : MonoBehaviour
 
     private Coroutine startVideoRoutine;
     private Coroutine delayedHapticRoutine;
+    private Coroutine nonResponsiveHapticLoopRoutine;
     private Coroutine endUIRoutine;
     private string reflectionPromptBaseText;
 
@@ -339,6 +343,12 @@ public class ExperimentFlow : MonoBehaviour
             StopCoroutine(delayedHapticRoutine);
         }
 
+        if (nonResponsiveHapticLoopRoutine != null)
+        {
+            StopCoroutine(nonResponsiveHapticLoopRoutine);
+            nonResponsiveHapticLoopRoutine = null;
+        }
+
         delayedHapticRoutine = StartCoroutine(PlayNonResponsiveHapticAfterReflection());
     }
 
@@ -358,8 +368,26 @@ public class ExperimentFlow : MonoBehaviour
             yield break;
         }
 
-        hapticsController.LoopHaptic(nonResponsiveGardenHapticEventName);
+        nonResponsiveHapticLoopRoutine = StartCoroutine(LoopNonResponsiveGardenHaptic());
         delayedHapticRoutine = null;
+    }
+
+    private IEnumerator LoopNonResponsiveGardenHaptic()
+    {
+        float refreshSeconds = Mathf.Max(0.1f, nonResponsiveGardenHapticRefreshSeconds);
+        bool hasStarted = false;
+
+        while (true)
+        {
+            if (hasStarted)
+            {
+                hapticsController.StopLastHaptic();
+            }
+
+            hapticsController.LoopHaptic(nonResponsiveGardenHapticEventName);
+            hasStarted = true;
+            yield return new WaitForSeconds(refreshSeconds);
+        }
     }
 
     private void StopAllHaptics()
@@ -368,6 +396,12 @@ public class ExperimentFlow : MonoBehaviour
         {
             StopCoroutine(delayedHapticRoutine);
             delayedHapticRoutine = null;
+        }
+
+        if (nonResponsiveHapticLoopRoutine != null)
+        {
+            StopCoroutine(nonResponsiveHapticLoopRoutine);
+            nonResponsiveHapticLoopRoutine = null;
         }
 
         if (hapticsController != null)
