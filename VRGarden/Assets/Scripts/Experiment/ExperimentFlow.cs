@@ -206,7 +206,18 @@ public class ExperimentFlow : MonoBehaviour
             reflectionGroup.SetActive(false);
         }
 
-        videoPhaseController.StartVideoPhase(false);
+        if (videoPhaseController == null)
+        {
+            Debug.LogWarning("ExperimentFlow: VideoPhaseController is not assigned.");
+            yield break;
+        }
+
+        if (trial.videoClip == null)
+        {
+            Debug.LogWarning($"ExperimentFlow: Trial {trial.trialIndex} does not have a video clip assigned.");
+        }
+
+        videoPhaseController.StartVideoPhase(trial.videoClip, false);
         yield return new WaitUntil(() => videoPhaseController == null || videoPhaseController.IsVideoPhaseComplete);
 
         bool isResponsive = trial.responsiveness == TrialManager.ResponsivenessType.Responsive;

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Video;
@@ -47,41 +47,43 @@ public class TrialManager : MonoBehaviour
         // StartCoroutine(RunNextTrial());
     }
 
+    private void OnValidate()
+    {
+        SetupTrials();
+    }
+
     public void SetupTrials()
     {
-        trials.Clear();
-
-        trials.Add(new Trial
+        if (trials == null)
         {
-            trialIndex = 0,
-            responsiveness = ResponsivenessType.Responsive,
-            haptic = HapticType.Haptic,
-            videoClip = sadClip
-        });
+            trials = new List<Trial>();
+        }
 
-        trials.Add(new Trial
-        {
-            trialIndex = 1,
-            responsiveness = ResponsivenessType.Responsive,
-            haptic = HapticType.NoHaptic,
-            videoClip = sadClip
-        });
+        trials.RemoveAll(existingTrial => existingTrial == null);
 
-        trials.Add(new Trial
-        {
-            trialIndex = 2,
-            responsiveness = ResponsivenessType.NonResponsive,
-            haptic = HapticType.Haptic,
-            videoClip = sadClip
-        });
+        EnsureTrial(0, ResponsivenessType.Responsive, HapticType.Haptic);
+        EnsureTrial(1, ResponsivenessType.Responsive, HapticType.NoHaptic);
+        EnsureTrial(2, ResponsivenessType.NonResponsive, HapticType.Haptic);
+        EnsureTrial(3, ResponsivenessType.NonResponsive, HapticType.NoHaptic);
+        trials.Sort((left, right) => left.trialIndex.CompareTo(right.trialIndex));
+    }
 
-        trials.Add(new Trial
+    private void EnsureTrial(int trialIndex, ResponsivenessType responsiveness, HapticType haptic)
+    {
+        Trial trial = trials.Find(existingTrial => existingTrial.trialIndex == trialIndex);
+        if (trial == null)
         {
-            trialIndex = 3,
-            responsiveness = ResponsivenessType.NonResponsive,
-            haptic = HapticType.NoHaptic,
-            videoClip = sadClip
-        });
+            trial = new Trial
+            {
+                trialIndex = trialIndex,
+                videoClip = sadClip
+            };
+
+            trials.Add(trial);
+        }
+
+        trial.responsiveness = responsiveness;
+        trial.haptic = haptic;
     }
 
     private IEnumerator RunNextTrial()
@@ -106,19 +108,27 @@ public class TrialManager : MonoBehaviour
 
         Debug.Log("All trials complete.");
     }
+
     public void RunTrialByIndex(int index)
-{
-    if (index < 0 || index >= trials.Count)
     {
-        Debug.LogWarning("Invalid trial index.");
-        return;
+        if (index < 0 || index >= trials.Count)
+        {
+            Debug.LogWarning("Invalid trial index.");
+            return;
+        }
+
+        StopAllCoroutines(); // stop any running trials
+
+        Trial selected = trials[index];
+        Debug.Log($"Manually starting trial {selected.trialIndex}: {selected.responsiveness} + {selected.haptic}");
+
+        if (experimentFlow != null)
+        {
+            StartCoroutine(experimentFlow.RunTrialSequence(selected));
+        }
+        else
+        {
+            Debug.LogWarning("ExperimentFlow is not assigned on TrialManager.");
+        }
     }
-
-    StopAllCoroutines(); // stop any running trials
-
-    Trial selected = trials[index];
-    Debug.Log($"Manually starting trial {selected.trialIndex}: {selected.responsiveness} + {selected.haptic}");
-
-    StartCoroutine(experimentFlow.RunTrialSequence(selected));
-}
 }

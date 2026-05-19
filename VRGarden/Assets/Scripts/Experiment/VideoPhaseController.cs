@@ -76,6 +76,11 @@ public class VideoPhaseController : MonoBehaviour
 
     public void StartVideoPhase(bool showReflectionOnEnd)
     {
+        StartVideoPhase(videoPlayer != null ? videoPlayer.clip : null, showReflectionOnEnd);
+    }
+
+    public void StartVideoPhase(VideoClip clipToPlay, bool showReflectionOnEnd)
+    {
         HideEndUI();
         IsVideoPhaseComplete = false;
 
@@ -104,6 +109,18 @@ public class VideoPhaseController : MonoBehaviour
 
         videoGroup.SetActive(true);
         reflectionGroup.SetActive(false);
+
+        if (clipToPlay == null)
+        {
+            Debug.LogWarning("VideoPhaseController: No video clip is assigned.");
+            videoGroup.SetActive(false);
+            IsVideoPhaseComplete = true;
+            return;
+        }
+
+        videoPlayer.Stop();
+        videoPlayer.clip = clipToPlay;
+        videoPlayer.time = 0d;
         videoPlayer.Play();
 
         StartCoroutine(WaitForVideoEnd(showReflectionOnEnd));
