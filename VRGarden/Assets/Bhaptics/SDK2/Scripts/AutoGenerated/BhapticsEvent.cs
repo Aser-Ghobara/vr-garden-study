@@ -22,5 +22,9 @@ namespace Bhaptics.SDK2
         public const string SAD = "sad";
         
         public const string RAINHAPTIC = "rainhaptic";
+        
+        public const string AMBIENT = "ambient";
+        
+        public const string WAVE = "wave";
     }
 }
