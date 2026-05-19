@@ -100,18 +100,7 @@ public class GardenController : MonoBehaviour
             sfxSource.Stop();
         }
 
-        // Scene start ambience: low jungle loop.
-        if (ambienceSource != null && jungleClip != null)
-        {
-            ambienceSource.clip = jungleClip;
-            ambienceSource.loop = true;
-            ambienceSource.volume = 0.05f;
-            ambienceSource.Play();
-        }
-        else if (ambienceSource == null || jungleClip == null)
-        {
-            Debug.LogWarning("GardenController: ambienceSource or jungleClip missing for scene start ambience.");
-        }
+        ResetGardenToNeutral();
     }
 
     public void RunResponsiveGarden(float valence, float intensity)
