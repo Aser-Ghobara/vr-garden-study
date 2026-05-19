@@ -327,7 +327,6 @@ public class GardenController : MonoBehaviour
         const float phase1Duration = 15f;
         const float phase2Duration = 15f;
         const float phase3Duration = 30f;
-        const float recoveryDuration = 45f;
         float t = 0f;
 
         if (!rainAlreadyStarted)
@@ -481,9 +480,6 @@ public class GardenController : MonoBehaviour
         PlayRainSystems();
         SetRainEmissionRate(3000f);
 
-        StopRainSystems();
-        SetRainGroupActive(false);
-
         StopLightningSystems();
         SetLightningGroupActive(false);
 
@@ -491,6 +487,60 @@ public class GardenController : MonoBehaviour
         {
             StopCoroutine(lightningFlashCoroutine);
             lightningFlashCoroutine = null;
+        }
+
+        if (sfxSource != null)
+        {
+            sfxSource.Stop();
+        }
+
+        StopPhase3HapticIfConfigured();
+
+        // RECOVERY: hold the reflection-end storm look, then settle quickly and remain recovered.
+        Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
+            ? midDayLight
+            : sunLight;
+
+        const float reflectionStormHoldDuration = 7f;
+        const float recoveryTransitionDuration = 7f;
+        const float recoveredHoldDuration = 30f;
+
+        Material reflectionEndSkybox = phase2Skybox != null ? phase2Skybox : phase3Skybox;
+        if (reflectionEndSkybox != null)
+        {
+            yield return StartCoroutine(SwapSkyboxWithFade(reflectionEndSkybox, ApplyReflectionEndStormState));
+        }
+        else
+        {
+            ApplyReflectionEndStormState();
+        }
+
+        yield return new WaitForSeconds(reflectionStormHoldDuration);
+
+        if (phase1Skybox != null)
+        {
+            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () =>
+            {
+                ApplyRecoveryTransitionStartState();
+                SetPostPhase3DeerActive(true);
+                SetPostPhase3FoxActive(true);
+                StartRecoveryBirdFlock();
+                StartRecoveryDeer();
+                StartRecoveryButterfly();
+                SetActiveLight(recoveryStartLight);
+                PlayRecoveryHapticIfConfigured();
+            }));
+        }
+        else
+        {
+            ApplyRecoveryTransitionStartState();
+            SetPostPhase3DeerActive(true);
+            SetPostPhase3FoxActive(true);
+            StartRecoveryBirdFlock();
+            StartRecoveryDeer();
+            SetActiveLight(recoveryStartLight);
+            PlayRecoveryHapticIfConfigured();
+            StartRecoveryButterfly();
         }
 
         if (ambienceSource != null && jungleClip != null)
@@ -505,44 +555,6 @@ public class GardenController : MonoBehaviour
         {
             ambienceSource.Stop();
         }
-
-        if (sfxSource != null)
-        {
-            sfxSource.Stop();
-        }
-
-        StopPhase3HapticIfConfigured();
-
-        // RECOVERY: swap back immediately, then settle quickly and remain recovered.
-        Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
-            ? midDayLight
-            : sunLight;
-
-        if (phase1Skybox != null)
-        {
-            yield return StartCoroutine(SwapSkyboxWithFade(phase1Skybox, () =>
-            {
-                SetPostPhase3DeerActive(true);
-                SetPostPhase3FoxActive(true);
-                StartRecoveryBirdFlock();
-                StartRecoveryDeer();
-                StartRecoveryButterfly();
-                SetActiveLight(recoveryStartLight);
-                PlayRecoveryHapticIfConfigured();
-            }));
-        }
-        else
-        {
-            SetPostPhase3DeerActive(true);
-            SetPostPhase3FoxActive(true);
-            StartRecoveryBirdFlock();
-            StartRecoveryDeer();
-            SetActiveLight(recoveryStartLight);
-            PlayRecoveryHapticIfConfigured();
-            StartRecoveryButterfly();
-        }
-
-        const float recoveryTransitionDuration = 15f;
 
         t = 0f;
         while (t < recoveryTransitionDuration)
@@ -562,8 +574,10 @@ public class GardenController : MonoBehaviour
         ttfeController.SetWindSpeed(2f);
         ttfeController.SetWindStrength(0.5f);
         RenderSettings.fogDensity = 0f;
+        SetRainEmissionRate(0f);
+        StopRainSystems();
+        SetRainGroupActive(false);
 
-        float recoveredHoldDuration = Mathf.Max(0f, recoveryDuration - recoveryTransitionDuration);
         if (recoveredHoldDuration > 0f)
         {
             yield return new WaitForSeconds(recoveredHoldDuration);
@@ -582,6 +596,38 @@ public class GardenController : MonoBehaviour
         phase3HapticEventName = null;
         recoveryHapticEventName = null;
         useMidDayLightForRecoveryStart = false;
+    }
+
+    private void ApplyReflectionEndStormState()
+    {
+        if (ttfeController != null)
+        {
+            ttfeController.SetSeason(1f);
+            ttfeController.SetWindSpeed(2.5f);
+            ttfeController.SetWindStrength(0.7f);
+        }
+
+        SetActiveLight(sunLight);
+        RenderSettings.fogDensity = 0.01f;
+        SetRainGroupActive(true);
+        ConfigureRainSystem();
+        PlayRainSystems();
+        SetRainEmissionRate(750f);
+    }
+
+    private void ApplyRecoveryTransitionStartState()
+    {
+        if (ttfeController != null)
+        {
+            ttfeController.SetSeason(2f);
+            ttfeController.SetWindSpeed(3f);
+            ttfeController.SetWindStrength(1f);
+        }
+
+        RenderSettings.fogDensity = 0.03f;
+        SetRainEmissionRate(0f);
+        StopRainSystems();
+        SetRainGroupActive(false);
     }
 
     private void SetActiveLight(Light activeLight)
