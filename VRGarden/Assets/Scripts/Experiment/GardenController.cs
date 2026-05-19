@@ -494,8 +494,6 @@ public class GardenController : MonoBehaviour
             sfxSource.Stop();
         }
 
-        StopPhase3HapticIfConfigured();
-
         // RECOVERY: hold the reflection-end storm look, then settle quickly and remain recovered.
         Light recoveryStartLight = useMidDayLightForRecoveryStart && midDayLight != null
             ? midDayLight
@@ -516,6 +514,7 @@ public class GardenController : MonoBehaviour
         }
 
         yield return new WaitForSeconds(reflectionStormHoldDuration);
+        StopPhase3HapticIfConfigured();
 
         if (phase1Skybox != null)
         {
