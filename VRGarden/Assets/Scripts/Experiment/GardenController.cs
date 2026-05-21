@@ -326,7 +326,7 @@ public class GardenController : MonoBehaviour
 
         const float phase1Duration = 15f;
         const float phase2Duration = 15f;
-        const float phase3Duration = 30f;
+        const float phase3Duration = 60f;
         float t = 0f;
 
         if (!rainAlreadyStarted)
@@ -400,7 +400,7 @@ public class GardenController : MonoBehaviour
         ttfeController.SetWindStrength(0.7f);
         RenderSettings.fogDensity = 0.01f;
 
-        // PHASE 3 (30-45s): storm escalation.
+        // PHASE 3 (30-90s): storm escalation.
         float totalElapsed = 0f;
         float nextLightningAt = float.MaxValue;
 
@@ -501,7 +501,7 @@ public class GardenController : MonoBehaviour
 
         const float reflectionStormHoldDuration = 7f;
         const float recoveryTransitionDuration = 7f;
-        const float recoveredHoldDuration = 30f;
+        const float recoveredHoldDuration = 45f;
 
         Material reflectionEndSkybox = phase2Skybox != null ? phase2Skybox : phase3Skybox;
         if (reflectionEndSkybox != null)
