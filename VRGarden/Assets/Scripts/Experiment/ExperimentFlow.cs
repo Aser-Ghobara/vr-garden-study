@@ -52,6 +52,10 @@ public class ExperimentFlow : MonoBehaviour
     [Tooltip("How often to re-trigger the non-responsive garden haptic if the bHaptics loop stops early.")]
     public float nonResponsiveGardenHapticRefreshSeconds = 2f;
 
+    [Header("Timing")]
+    [Tooltip("Neutral garden hold after reflection for non-responsive trials. With the 30s reflection, this matches responsive trial length (~152s post-video).")]
+    public float nonResponsivePostReflectionHoldSeconds = 122f;
+
     [Header("Reflection Recording")]
     [Tooltip("Participant identifier included in saved reflection recording filenames.")]
     public string participantId = "participant";
@@ -315,7 +319,7 @@ public class ExperimentFlow : MonoBehaviour
 
         if (gardenController != null)
         {
-            gardenController.ConfigureRecoveryLighting(trial.trialIndex == 0);
+            gardenController.ConfigureRecoveryLighting(isResponsive);
         }
 
         if (!isResponsive)
@@ -326,7 +330,7 @@ public class ExperimentFlow : MonoBehaviour
             }
 
             Debug.Log("Non-responsive trial: garden stays neutral.");
-            StartEndUIRoutine(ShowEndUIAfterDelay(60f));
+            StartEndUIRoutine(ShowEndUIAfterDelay(nonResponsivePostReflectionHoldSeconds));
             yield break;
         }
 
